@@ -12,8 +12,8 @@ exports.createPlatform = async (req, res) => {
     if (!file) {
       return res.status(400).json({ message: "Must include image file" });
     }
-    // const { nodeId } = await uploadFile(file, "platform");
-    const platform = new Platform(req.body);
+    const { nodeId } = await uploadFile(file, "platform");
+    const platform = new Platform({...req.body, icon:nodeId});
     const savedplatform = await platform.save();
     if (!savedplatform)
       return res

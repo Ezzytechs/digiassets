@@ -28,12 +28,12 @@ exports.listAsset = async (req, res) => {
       res.status(404).json({
         message: "Unable to find the associated platform for the category",
       });
-    // const { nodeId } = await uploadFile(file, "asset");
+    const { nodeId } = await uploadFile(file, "asset");
     const asset = {
       ...req.body,
       platform: platform.platform,
       seller: req.user.userId,
-      image: "nodeId",
+      image: nodeId,
     };
     const newAsset = new Asset(asset);
     const savedAsset = await newAsset.save();

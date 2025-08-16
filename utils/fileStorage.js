@@ -3,12 +3,12 @@ const multer = require("multer");
 const sendEmail=require("./mailer/mailer");
 const {siteEmail}=require("../configs/credentials");
 require("dotenv").config();
-const { MEGA_EMAIL, MEGA_PASSWORD } = process.env;
+const { SITE_EMAIL, MEGA_PASSWORD } = process.env;
 
 async function initializeStorage() {
   return new Promise((resolve, reject) => {
     const storage = mega({
-      email: MEGA_EMAIL,
+      email: SITE_EMAIL,
       password: MEGA_PASSWORD,
     });
 

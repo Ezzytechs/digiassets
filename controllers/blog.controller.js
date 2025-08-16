@@ -13,12 +13,9 @@ exports.createPost = async (req, res) => {
 
     if(!file) res.status(400).json({Message:"File is required"})
 
-    let image = "";
-    // if (file) {
-    //   const { nodeId } = await uploadFile(file, "blog");
-    //   image = nodeId;
-    // }
-    const post = new Post({ ...req.body, image, author:req.user.userId });
+      const { nodeId } = await uploadFile(file, "blog");
+   
+    const post = new Post({ ...req.body, image:nodeId, author:req.user.userId });
     const savedPost = await post.save();
     res.status(201).json(savedPost);
   } catch (err) {
@@ -111,7 +108,7 @@ exports.updatePost = async (req, res) => {
 exports.deletePost = async (req, res) => {
   try {
     const deletedPost = await Post.findByIdAndDelete(req.params.id);
-    // await deleteFile(deletedPost.image, "blog");
+    await deleteFile(deletedPost.image, "blog");
     if (!deletedPost)
       return res.status(404).json({ message: "Post not found" });
     res.status(200).json({ message: "Post deleted successfully" });
