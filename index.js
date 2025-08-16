@@ -1,21 +1,21 @@
 require("dotenv").config();
 const express = require("express");
 const morgan = require("morgan");
-const connectDB = require("../configs/dbb");
+const connectDB = require("./configs/db");
 const PORT = process.env.PORT || 3000;
 
 //routes
-const userRoutes = require("../routes/users.routess");
-const authRoutes = require("../routes/auth.routess");
-const orderRoutes = require("../routes/order.routess");
-const blogRoutes = require("../routes/blog.routess");
-const categoryRoutes = require("../routes/category.routess");
-const assetRoutes = require("../routes/assets.routess");
-const walletRoutes = require("../routes/wallet.routess");
-const paymentRoutes = require("../routes/payment.routess");
-const transactionRoutes = require("../routes/transactions.routess");
-const platformRoutes = require("../routes/platform.routess");
-const notificationRoutes = require("../routes/notification.routess");
+const authRoutes = require("./routes/auth.routes");
+const userRoutes = require("./routes/users.routes");
+const orderRoutes = require("./routes/order.routes");
+const blogRoutes = require("./routes/blog.routes");
+const categoryRoutes = require("./routes/category.routes");
+const assetRoutes = require("./routes/assets.routes");
+const walletRoutes = require("./routes/wallet.routes");
+const paymentRoutes = require("./routes/payment.routes");
+const transactionRoutes = require("./routes/transactions.routes");
+const platformRoutes = require("./routes/platform.routes");
+const notificationRoutes = require("./routes/notification.routes");
 
 const app = express();
 

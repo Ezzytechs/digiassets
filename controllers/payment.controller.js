@@ -42,16 +42,14 @@ exports.initPayment = async (req, res) => {
       phone,
       userId: user?._id || null,
     };
-    console.log(transactionData)
-    res.status(200).json({ transactionData });
     //init payment
-    // const initPayment = initializeTransaction(transactionData);
-    // if (!initPayment)
-    //   return res.status(400).json({
-    //     message:
-    //       "Unable to process your order. Please try again later. Thank you",
-    //   });
-    // res.status(200).json(initPayment);
+    const initPayment = initializeTransaction(transactionData);
+    if (!initPayment)
+      return res.status(400).json({
+        message:
+          "Unable to process your order. Please try again later. Thank you",
+      });
+    res.status(200).json(initPayment);
   } catch (err) {
     console.log(err);
     res.status(500).json({ message: err.message });
@@ -60,7 +58,6 @@ exports.initPayment = async (req, res) => {
 
 exports.verifyPament = async (req, res) => {
   try {
-    const transaction = req.body;
     const { reference } = req.query;
     //Check if reference is provided
     if (!reference) {
@@ -76,17 +73,17 @@ exports.verifyPament = async (req, res) => {
         .json({ message: "Transaction verified successfully" });
 
     //Verify payment on payment gateway
-    // const transaction = await verifyPayment(reference);
-    // if (!transaction) {
-    //   return res.status(400).json({ message: "Unable to verify transaction" });
-    // }
-    //check payment status
-    // if (transaction.paymentStatus !== "PAID") {
-    //   return res.status(400).json({ message: "Transaction not successful" });
-    // }
+    const transaction = await verifyPayment(reference);
+    if (!transaction) {
+      return res.status(400).json({ message: "Unable to verify transaction" });
+    }
+   // check payment status
+    if (transaction.paymentStatus !== "PAID") {
+      return res.status(400).json({ message: "Transaction not successful" });
+    }
 
     //Get transaction meta data from payment gateway
-    const { asset, email, phone, paymentReference } = transaction; //.metaData;
+    const { asset, email, phone, paymentReference } = transaction.metaData;
 
     //calculate asset total amount on database
     const { assetDetails, assetTotalAmount } =
@@ -106,7 +103,6 @@ exports.verifyPament = async (req, res) => {
       tnxReference: paymentReference,
       gatewayRef: reference,
     });
-console.log("order")
     if (!order) {
       return res.status(400).json({ message: "Unable to place order" });
     }
