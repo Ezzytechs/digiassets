@@ -1,0 +1,14 @@
+ORDER
+use webhook or verification hook
+Observers
+
+EMAIL NOTIFICATIONS
+registration notifications
+otp notifications
+order notifications - seller, buyer admin
+order/asset credentials notifications seller, buyer, admin
+payment comfirmations payer, admin payee
+
+wallet
+pay to wallet
+pay from wallet
