@@ -1,7 +1,7 @@
 const Order = require("../models/orders.model");
 const { User } = require("../models/users.model");
-const { Wallet } = require("../models/wallet.model");
-const { Transaction } = require("../models/transaction.model");
+const  Wallet  = require("../models/wallet.model");
+const Transaction  = require("../models/transaction.model");
 const Credential = require("../models/credential.model");
 const { encrypt, decrypt } = require("../utils/encryption");
 const { paginate } = require("../utils/pagination");
@@ -13,7 +13,7 @@ exports.cancelOrder = async (req, res) => {
   try {
     const { id } = req.params;
     //get the order
-    const order = await Order.findById(id).populate("assets.asset");
+    const order = await Order.findById(id).populate("asset");
     if (!order)
       return res
         .status(400)
@@ -23,29 +23,28 @@ exports.cancelOrder = async (req, res) => {
       return res.status(400).json({
         message: "Credentials has been submitted by the seller",
       });
-    if (order.seller !== req.user.userId || order.buyer !== req.user.userId)
-      return res.status(403).json({ message: "Unauthorized!" });
+    if (order.seller.toString() !== req.user.userId && order.buyer.toString() !== req.user.userId)
+      return res.status(403).json({ message: "You are not authorized to cancel this order" });
 
     let deletedTransaction;
 
     if (order.nonRegUser.email) {
-      //send mail to new user
-      emailObserver.emit("SEND_MAIL", {
-        to: order.nonRegUser.email,
-        subject: `Refund Notification`,
-        templateFunc: () =>
-          emailTemplate.welcomeMessage(
-            user.username,
-            credentials.siteName,
-            credentials.loginURL,
-            credentials.supportEmail
-          ),
-      });
+      // //send mail to new user
+      // emailObserver.emit("SEND_MAIL", {
+      //   to: order.nonRegUser.email,
+      //   subject: `Refund Notification`,
+      //   templateFunc: () =>
+      //     emailTemplate.welcomeMessage(
+      //       user.username,
+      //       credentials.siteName,
+      //       credentials.loginURL,
+      //       credentials.supportEmail
+      //     ),
+      // });
 
       deletedTransaction = await Transaction.findOneAndDelete({
         to: order.seller,
         "nonRegUser.email": order.nonRegUser.email,
-        status: "paid",
         gatewayRef: order.payRef,
       });
     } else {
@@ -63,8 +62,8 @@ exports.cancelOrder = async (req, res) => {
           .json({ message: "buyer wallet missing important credentials" });
       //construct the transfer details
       const transferDetails = {
-        amount: order.assets.price,
-        reference: `refund to ${buyerWallet.accountDetails.accountNumber} for ${order.assets.title}`,
+        amount: order.price,
+        reference: `refund to ${buyerWallet.accountDetails.accountNumber} for ${order.asset._id}`,
         narration: "Refund",
         destinationBankCode: buyerWallet.accountDetails.sortCode,
         destinationAccountNumber: buyerWallet.accountDetails.accountNumber,
@@ -88,21 +87,22 @@ exports.cancelOrder = async (req, res) => {
     order.status = "cancelled";
     await order.save();
     //send mail to new user
-    emailObserver.emit("SEND_MAIL", {
-      to: order.nonRegUser.email,
-      subject: `Refund Successful`,
-      templateFunc: () =>
-        emailTemplate.welcomeMessage(
-          user.username,
-          credentials.siteName,
-          credentials.loginURL,
-          credentials.supportEmail
-        ),
-    });
+    // emailObserver.emit("SEND_MAIL", {
+    //   to: order.nonRegUser.email,
+    //   subject: `Refund Successful`,
+    //   templateFunc: () =>
+    //     emailTemplate.welcomeMessage(
+    //       user.username,
+    //       credentials.siteName,
+    //       credentials.loginURL,
+    //       credentials.supportEmail
+    //     ),
+    // });
 
     res.status(200).json({ order, message: "Refund successful" });
   } catch (err) {
-    res.staus(500).json({ message: err.message });
+    // console.log(err)
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -127,35 +127,35 @@ exports.getAllOrders = async (req, res) => {
 exports.getOrderStats = async (req, res) => {
   try {
     // Get counts based on status
-    const [total, paid, credentialed_submitted, completed, cancelled] =
+    const [total, paid, credentials_submitted, completed, cancelled] =
       await Promise.all([
         Order.countDocuments(),
         Order.countDocuments({ status: "paid" }),
-        Order.countDocuments({ status: "credentialed_submitted" }),
+        Order.countDocuments({ status: "credentials_submitted" }),
         Order.countDocuments({ status: "completed" }),
         Order.countDocuments({ status: "cancelled" }),
       ]);
 
     // Total revenue
     const totalRevenueAgg = await Order.aggregate([
-      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+      { $group: { _id: null, total: { $sum: "$price" } } },
     ]);
     const totalRevenue = totalRevenueAgg[0]?.total || 0;
 
     // Registered users' orders
     const registeredOrdersCount = await Order.countDocuments({
-      userId: { $ne: null },
+      buyer: { $ne: null },
     });
 
     // Unregistered users' orders
     const unregisteredOrdersCount = await Order.countDocuments({
-      userId: null,
+      buyer: null,
     });
 
     res.status(200).json({
       total,
       paid,
-      credentialed_submitted,
+      credentials_submitted,
       cancelled,
       completed,
       totalRevenue,

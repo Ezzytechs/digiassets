@@ -1,14 +1,24 @@
 const Notification = require("../models/notification.model");
+const { paginate } = require("../utils/pagination");
 
 // Get all notifications
 exports.getAllNotifications = async (req, res) => {
   try {
-    const query = req.user.isAdmin
+    const { page = 1, limit = 20, ...query } = req.query;
+
+    const searchQuery = req.user.isAdmin
       ? { event: { $in: ["VIEWED", "SUBMIT_CREDENTIALS"] } }
       : { to: req.user.userId };
-    const notifications = await Notification.find(query).sort({
-      createdAt: -1,
-    });
+
+    const options = {
+      filter: { ...query, ...searchQuery },
+      populate: null,
+      page,
+      limit,
+      select: "-description",
+    };
+
+    const notifications = await paginate(Notification, options);
     res.status(200).json(notifications);
   } catch (err) {
     console.log(err);

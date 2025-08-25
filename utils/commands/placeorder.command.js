@@ -3,6 +3,7 @@ const Order = require("../../models/orders.model");
 const Transaction = require("../../models/transaction.model");
 const Asset = require("../../models/assets.model");
 const Notification = require("../../models/notification.model");
+const Credential = require("../../models/credential.model");
 
 const placeOrderCommand = async ({
   email,
@@ -21,15 +22,18 @@ const placeOrderCommand = async ({
     ) {
       throw new Error("Email, phone, and Asset list are required.");
     }
-    // Find buyer (if exists) and get id
+
+    // Find buyer if registered
     const buyer = await User.findOne({ email });
     const buyerId = buyer ? buyer._id : null;
-    //create order and transaction for each assetId
-    assets.map(async (asset, index) => {
-      //find the asset ordered
-      const orderedAsset = await Asset.findById(asset);
 
-      //create new order data
+    // Process assets one by one
+    for (let i = 0; i < assets.length; i++) {
+      const assetId = assets[i];
+      const orderedAsset = await Asset.findById(assetId);
+      if (!orderedAsset) throw new Error("Asset not found");
+
+      // Create order
       const order = new Order({
         seller: orderedAsset.seller,
         buyer: buyerId,
@@ -41,38 +45,45 @@ const placeOrderCommand = async ({
       const newOrder = await order.save();
       if (!newOrder) throw new Error("Unable to create order");
 
-      //create notification 
+      // Create notification
       const notification = new Notification({
         orderId: newOrder._id,
         to: orderedAsset.seller,
       });
       const savedNotification = await notification.save();
-      if (!savedNotification) throw new Error("Unalbe to create order");
-      
-      //update asset to sold
-      orderedAsset.isSold = true;
-      const updateAssetToSold = await orderedAsset.save();
-      if (!updateAssetToSold) throw new Error("Unable to place order");
+      if (!savedNotification) throw new Error("Unable to create notification");
 
-      //create new transaction record
+      // If featured asset → move credentials & update order
+      if (orderedAsset.status === "featured") {
+        await Credential.findOneAndUpdate(
+          { orderId: orderedAsset._id },
+          { orderId: newOrder._id }
+        );
+        newOrder.status = "credentials_submitted";
+        await newOrder.save();
+      }
+
+      // Mark asset as sold
+      orderedAsset.status = "sold";
+      await orderedAsset.save();
+
+      // Create transaction
       const transaction = new Transaction({
         from: buyerId || null,
         nonRegUser: !buyer ? { email, phone } : undefined,
         to: orderedAsset.seller,
         amount: orderedAsset.price,
         type: "credit",
-        tnxReference: tnxReference + index++,
-        tnxDescription: `${asset.price} paid for asset ${asset.title}`,
+        tnxReference: `${tnxReference}_${i}`,
+        tnxDescription: `${orderedAsset.price} paid for asset ${orderedAsset.title}`,
         gatewayRef,
       });
-      const newTransaction = await transaction.save();
+      await transaction.save();
+    }
 
-      if (!newTransaction) throw new Error("Unable to create transaction");
-    });
-
-    return "Order placed successfully and success!";
+    return "Order placed successfully!";
   } catch (err) {
-    console.log(err);
+    console.error(err);
     throw err;
   }
 };

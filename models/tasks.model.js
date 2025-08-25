@@ -6,18 +6,19 @@ const assetSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      index:true,
+      index: true,
     },
     platform: {
       type: mongoose.Schema.Types.ObjectId,
-      ref:"Platform",
-      index:true,
+      ref: "Platform",
+      index: true,
     },
     category: {
       type: mongoose.Schema.Types.ObjectId,
-      ref:"Category",
-      index:true,
+      ref: "Category",
+      index: true,
     },
+    age: { type: Number, default: 0 },
     url: {
       type: String,
       required: [true, "Url of the asset is required"],
@@ -32,18 +33,16 @@ const assetSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0,
-      index:true,
+      index: true,
     },
     seller: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
-
-    status: {
-      type: String,
-      enum:["sold", "available", "featured"],
-      default:"available"
+    isSold: {
+      type: Boolean,
+      default: false,
     },
     image: String,
     metadata: {
@@ -52,6 +51,12 @@ const assetSchema = new mongoose.Schema(
       accountAge: Number,
       engagementRate: Number,
       extraDetails: String,
+    },
+    credentials: {
+      username: { type: String },
+      password: { type: String },
+      notes: { type: String },
+      encrypted: { type: Boolean, default: true },
     },
     verified: {
       type: Boolean,

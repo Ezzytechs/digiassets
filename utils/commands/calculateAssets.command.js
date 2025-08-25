@@ -7,7 +7,7 @@ const calculateAssetDetailsCommand = async (assetIds, session = null) => {
       const asset = await Asset.findById(assetId).session(session);
       if (!asset) throw new Error(`Asset with ID ${assetId} not found`);
       assetTotalAmount += asset.price;
-      return { asset: asset._id };
+      return asset._id ;
     })
   );
   return { assetDetails, assetTotalAmount };

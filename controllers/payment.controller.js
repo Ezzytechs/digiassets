@@ -14,17 +14,16 @@ const calculateAssetDetailsCommand = require("../utils/commands/calculateAssets.
 
 exports.initPayment = async (req, res) => {
   try {
-    const { email, phone, assets } = req.body;
+    const { email, phone="NA", assets } = req.body;
     if (
       !email ||
-      !phone ||
       !assets ||
       !Array.isArray(assets) ||
       assets.length === 0
     ) {
       return res
         .status(400)
-        .json({ message: "Email, Phone number and assets IDs are required" });
+        .json({ message: "Email and assets IDs are required" });
     }
     //get user details
     const user = await User.findOne({ email });
@@ -43,11 +42,11 @@ exports.initPayment = async (req, res) => {
       userId: user?._id || null,
     };
     //init payment
-    const initPayment = initializeTransaction(transactionData);
+    const initPayment =await initializeTransaction(transactionData);
     if (!initPayment)
       return res.status(400).json({
         message:
-          "Unable to process your order. Please try again later. Thank you",
+          "Unable to initialize your payment. Please try again later. Thank you",
       });
     res.status(200).json(initPayment);
   } catch (err) {
@@ -102,7 +101,7 @@ exports.verifyPament = async (req, res) => {
       assets: asset,
       tnxReference: paymentReference,
       gatewayRef: reference,
-    });
+    }); 
     if (!order) {
       return res.status(400).json({ message: "Unable to place order" });
     }

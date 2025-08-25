@@ -10,36 +10,74 @@ const Category = require("../models/category.model");
 const Platform = require("../models/platform.model");
 const { User } = require("../models/users.model");
 const Order = require("../models/orders.model");
+const Credential = require("../models/credential.model");
+const { encrypt } = require("../utils/encryption");
 
 // list asset
 exports.listAsset = async (req, res) => {
   try {
-    //check if user is ban from listing asset
+    // check if user is banned from listing asset
     const id = req.user.userId;
-    const user = User.findById(id).select("isSuspended");
-    if (user.isSuspended)
+    const user = await User.findById(id).select("isSuspended");
+    if (user?.isSuspended) {
       return res.status(403).json({ message: "Your account is suspended!" });
+    }
+
+    // file validation
     const file = req.file;
     if (!file) {
       return res.status(400).json({ message: "Must include image file" });
     }
+
+    // validate category
     const platform = await Category.findById(req.body.category);
-    if (!platform)
-      res.status(404).json({
+    if (!platform) {
+      return res.status(404).json({
         message: "Unable to find the associated platform for the category",
       });
-    const { nodeId } = await uploadFile(file, "asset");
-    const asset = {
+    }
+
+    // upload image
+    const { nodeId } = await uploadFile(file.buffer, file.originalname, "asset");
+
+    // create new asset
+    const newAsset = new Asset({
       ...req.body,
       platform: platform.platform,
       seller: req.user.userId,
       image: nodeId,
-    };
-    const newAsset = new Asset(asset);
+    });
     const savedAsset = await newAsset.save();
+
+    // handle credentials if provided
+    const { username = null, password = null, notes = null } = req.body.credentials || {};
+    if (username && password) {
+      const encryptedData = {
+        username: encrypt(username),
+        password: encrypt(password),
+        notes: encrypt(notes || ""),
+        encrypted: true,
+      };
+
+      const credentials = new Credential({
+        credentials: { ...encryptedData },
+        orderId: savedAsset._id,
+      });
+      const savedCredentials = await credentials.save();
+
+      if (!savedCredentials) {
+        return res.status(404).json({
+          message: "Unable to create featured asset, Please try again",
+        });
+      }
+      // ✅ update asset to featured after credentials saved
+      savedAsset.status = "featured";
+      await savedAsset.save();
+    }
+
     res.status(201).json(savedAsset);
   } catch (err) {
-    console.log(err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -52,8 +90,8 @@ exports.getAllAssets = async (req, res) => {
       filter: { ...query },
       limit,
       page,
-      populate: "seller",
-      populateSelect: "username email phone",
+      populate: "seller platform category",
+      populateSelect: "username email phone name icon",
       select: "-description",
     };
     const assets = await paginate(Asset, options);
@@ -81,7 +119,7 @@ exports.getAssetsByCategoryName = async (req, res) => {
     if (category !== "assets") {
       const categoryId = await Category.findOne({
         name: category,
-        platform: platformId,
+        platform: platformId._id,
       });
       if (!categoryId)
         return res.status(404).json({ message: "Category not found" });
@@ -128,8 +166,8 @@ exports.getUserAssets = async (req, res) => {
       filter: { ...query, ...sellerId },
       page,
       limit,
-      populate: "seller category platform",
-      select: "-description username email phone",
+      populate: "category platform",
+      populateSelect: "phone name icon",
     };
     const assets = await paginate(Asset, options);
     if (!assets || assets.length === 0)
@@ -161,7 +199,7 @@ exports.getAssetImage = async (req, res) => {
     if (!id) {
       return res.status(400).json({ error: "Filename is required" });
     }
-    const fileStream = await getFileStream(id, "cover");
+    const fileStream = await getFileStream(id, "asset");
     // Set appropriate headers for media files
     res.setHeader("Content-Type", "image/jpeg");
     res.setHeader("Cache-Control", "public, max-age=31536000");
@@ -188,7 +226,7 @@ exports.updateAsset = async (req, res) => {
         return res
           .status(400)
           .json({ message: "unable to update this product" });
-      const { nodeId } = await uploadFile(file, "asset");
+      const { nodeId } = await uploadFile(file.buffer, file.originalname, "asset");
       newImage = nodeId;
     }
     newImage = newImage ? { image: newImage } : {};
@@ -217,7 +255,6 @@ exports.deleteAsset = async (req, res) => {
   try {
     const assetId = req.params.id;
     let deletedAsset = null;
-    //put the delete in session to avoid imbalances!
 
     const assetOrder = await Order.findOne({ asset: assetId });
     if (assetOrder)
@@ -248,7 +285,6 @@ exports.filterAssets = async (req, res) => {
     let query = {};
     if (req.query.platform) query.platform = req.query.platform;
     if (req.query.category) query.category = req.query.category;
-    query.isSold = false;
 
     const limit = req.query.limit || 20;
     const page = req.query.page || 1;
@@ -280,9 +316,6 @@ exports.getAssetsStats = async (req, res) => {
     if (filterQuery.seller) {
       filterQuery.seller = new mongoose.Types.ObjectId(filterQuery.seller);
     }
-    if (filterQuery.isSold) {
-      filterQuery.isSold = filterQuery.isSold === "true" ? true : false;
-    }
 
     const count = await Asset.countDocuments({ ...filterQuery });
 
@@ -304,14 +337,15 @@ exports.getAssetsStats = async (req, res) => {
 // Get stats and revenue of assets
 exports.assetsStats = async (req, res) => {
   try {
-    const [all, available, sold] = await Promise.all([
+    const [all, available, featured, sold,] = await Promise.all([
       await Asset.countDocuments({}),
-      await Asset.countDocuments({ isSold: false }),
-      await Asset.countDocuments({ isSold: true }),
+      await Asset.countDocuments({ status: "available" }),
+      await Asset.countDocuments({ status: "featured" }),
+      await Asset.countDocuments({ status: "sold" }),
     ]);
-    if (!sold || !available || !all)
+    if ((!sold || !available || !all, !featured))
       return res.status(400).json({ message: "Unable to load statistics" });
-    res.status(200).json({ all, available, sold });
+    res.status(200).json({ all, available, sold, featured });
   } catch (err) {
     console.log(err);
     res.status(500).json({ error: err.message });

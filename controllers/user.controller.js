@@ -9,8 +9,6 @@ const {paginate} = require("../utils/pagination")
 //Get all users
 exports.getAllusers = async (req, res) => {
   try {
-    // await User.deleteMany({})
-    // await Wallet.deleteMany({})
     let { limit = 20, page = 1, ...query } = req.query || {};
     const options = {
       filter: { ...query },

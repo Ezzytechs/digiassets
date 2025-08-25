@@ -1,13 +1,13 @@
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
-const {JWT_ACCESS_TOKEN, JWT_REFRESH_TOKEN} = process.env;
+const { JWT_ACCESS_TOKEN, JWT_REFRESH_TOKEN } = process.env;
 const userSchema = new mongoose.Schema(
   {
     username: {
       type: String,
-      trim:true,
-      lowercase:true,
+      trim: true,
+      lowercase: true,
       unique: [true, "User with this username already exist!"],
       required: [true, "Username cannot be empty!"],
       minlength: [5, "Username must be at least 5 characters!"],
@@ -22,30 +22,32 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      trim:true,
+      trim: true,
     },
     avatar: { type: String },
     gender: String,
-    dob:Date,
+    dob: Date,
     email: {
       type: String,
-      lowercase:true,
+      lowercase: true,
       required: [true, "Email cannot be empty!"],
       unique: [true, "User with this email already exist!"],
       match: [/^\S+@\S+\.\S+$/, "Please provide valid email address!"],
       trim: true,
-      index:true,
+      index: true,
     },
     password: {
       type: String,
       trim: true,
       required: [true, "Password cannot be empty!"],
     },
-    otp:{
-      otpCode:Number,
-      otpExpires:Date,},
+    otp: {
+      otpCode: Number,
+      otpExpires: Date,
+    },
     isAdmin: { type: Boolean, default: false },
-    isSuspended:{type:Boolean, default:false}
+    isSuspended: { type: Boolean, default: false },
+    isInvited: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
@@ -57,15 +59,15 @@ userSchema.methods.generateAuthTokens = async function () {
   const payload = {
     userId: user._id,
     username: user.username,
-    email:user.email,
+    email: user.email,
     isAdmin: user.isAdmin,
   };
 
-  const accessToken =await jwt.sign(payload, JWT_ACCESS_TOKEN, {
+  const accessToken = await jwt.sign(payload, JWT_ACCESS_TOKEN, {
     expiresIn: "30d",
   });
 
-  const refreshToken =await jwt.sign(payload, JWT_REFRESH_TOKEN, {
+  const refreshToken = await jwt.sign(payload, JWT_REFRESH_TOKEN, {
     expiresIn: "15m",
   });
   return { accessToken, refreshToken };
@@ -80,11 +82,11 @@ userSchema.methods.setRefreshTokenCookie = function (res, token) {
   });
 };
 
-userSchema.methods.suspendUser=async function (){
-  const user=this
-  user.isSuspended=true
-  await user.save()
-}
+userSchema.methods.suspendUser = async function () {
+  const user = this;
+  user.isSuspended = true;
+  await user.save();
+};
 exports.User = mongoose.model("User", userSchema);
 exports.userSchema = userSchema;
 // module.exports = mongoose.model("Order", orderSchema);

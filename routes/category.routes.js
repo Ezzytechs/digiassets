@@ -10,6 +10,9 @@ router.post('/', auth, admin, upload.single("image"), categoryController.createC
 //get all categories
 router.get('/', categoryController.getAllCategories);
 
+//get all categories
+router.get('/image/view/:id', categoryController.getCategoryImage);
+
 //get category by id
 router.get('/:id', categoryController.getCategoryById);
 

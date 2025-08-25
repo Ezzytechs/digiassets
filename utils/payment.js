@@ -1,10 +1,9 @@
 const axios = require("axios");
 require("dotenv").config();
 const credentials = require("../configs/credentials");
+const { MONNIFY_API_KEY, MONNIFY_SECRET_KEY, MONNIFY_CONTRACT_CODE } =
+  process.env;
 const authenticateMonnify = async () => {
-  const { MONNIFY_API_KEY, MONNIFY_SECRET_KEY, MONNIFY_CONTRACT_CODE } =
-    process.env;
-
   const authString = Buffer.from(
     `${MONNIFY_API_KEY}:${MONNIFY_SECRET_KEY}`
   ).toString("base64");
@@ -21,7 +20,9 @@ const authenticateMonnify = async () => {
     return response.data.responseBody.accessToken;
   } catch (error) {
     console.error("Error authenticating with Monnify:", error.response?.data);
-    throw error;
+    throw new Error(
+      "Error processing your transaction. Please try after sometimes."
+    );
   }
 };
 
@@ -36,25 +37,38 @@ const initializeTransaction = async (transactionData) => {
     paymentDescription,
   } = transactionData;
   try {
-    const metaData = {
-      totalAmount,
-      paymentReference,
-      phone,
-      email,
-      asset,
-    };
-    
-    const paymentData = {
-      amount: totalAmount,
-      customerName: email,
-      customerEmail: email,
-      paymentReference,
+ const metaData = {
+  totalAmount: totalAmount.toString(),
+  paymentReference: paymentReference.toString(),
+  phone: phone.toString(),
+  email: email,
+  asset: typeof asset === "string" ? asset : JSON.stringify(asset),
+};
+
+// console.log(transactionData)
+const paymentData = {
+      amount:totalAmount,
+      customerName:"James Ezekiel",
+      customerEmail:"jameze49@gmail.com",
+      paymentReference:paymentReference.toString(),
       paymentDescription,
       currencyCode: "NGN",
       contractCode: MONNIFY_CONTRACT_CODE,
-      redirectUrl: `${credentials.siteURL}/payment-success`,
+      redirectUrl: `${credentials.siteURL}/verify-pay`,
       paymentMethods: ["CARD", "ACCOUNT_TRANSFER", "USSD"],
     };
+    // const paymentData = {
+    //   amount: totalAmount,
+    //   customerName: "James Ezekiel",
+    //   customerEmail: email,
+    //   paymentReference,
+    //   paymentDescription,
+    //   currencyCode: "NGN",
+    //   contractCode: MONNIFY_CONTRACT_CODE,
+    //   redirectUrl: `${credentials.siteURL}/verify-pay`,
+    //   paymentMethods: ["CARD", "ACCOUNT_TRANSFER", "USSD"],
+    // };
+
 
     const response = await axios.post(
       "https://sandbox.monnify.com/api/v1/merchant/transactions/init-transaction",
@@ -68,10 +82,13 @@ const initializeTransaction = async (transactionData) => {
         },
       }
     );
+        console.log("Transfer Response:", response.data.responseBody);
     return response.data.responseBody;
   } catch (error) {
     console.error("Error creating transaction:", error);
-    throw error;
+    throw new Error(
+      "Error processing your transaction. Please try after sometimes."
+    );
   }
 };
 
@@ -105,12 +122,15 @@ const makeTransfer = async (
       },
     });
 
-    return "Transfer Response:", response.data;
     console.log("Transfer Response:", response.data);
+    return "Transfer Response:", response.data;
   } catch (error) {
     console.error(
       "Error making transfer:",
-      error.response?.data || error.message
+      error.response?.data || error.message || error
+    );
+    throw new Error(
+      "Error processing your transaction. Please try after sometimes."
     );
   }
 };
