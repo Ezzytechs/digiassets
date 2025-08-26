@@ -12,7 +12,7 @@ exports.createCategory = async (req, res) => {
     if (!file) {
       return res.status(400).json({ message: "Must include image file" });
     }
-    const { nodeId } = await uploadFile(file, "category");
+    const { nodeId } = await uploadFile(file.buffer, file.originalname, "category");
     const category = new Category({...req.body, icon:nodeId});
     const savedCategory = await category.save();
     if (!savedCategory)
