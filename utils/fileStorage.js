@@ -156,25 +156,21 @@ async function deleteFile(filename, folderName) {
     const root = storage.mounts[0];
 
     // Find the "cover" folder
-    const coverFolder = root.children.find(
-      (child) => child.name === folderName
-    );
+    const fileFolder = root.children.find((child) => child.name === folderName);
 
-    if (!coverFolder) {
-      throw new Error("Cover folder not found");
+    if (!fileFolder) {
+      throw new Error("file folder not found");
     }
 
     // Find the file inside the "cover" folder
-    const file = coverFolder.children.find(
-      (child) => child.nodeId === filename
-    );
+    const file = fileFolder.children.find((child) => child.nodeId === filename);
 
     if (!file) {
       throw new Error("File not found in cover folder");
     }
 
     const deleteF = await file.delete(true);
-
+    if (!deleteF) throw new Error("Unable to delete the file!");
     return "File deleted successfully"; // Return success message
   } catch (error) {
     throw new Error(

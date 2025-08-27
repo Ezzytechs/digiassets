@@ -38,7 +38,11 @@ exports.listAsset = async (req, res) => {
     }
 
     // upload image
-    const { nodeId } = await uploadFile(file.buffer, file.originalname, "asset");
+    const { nodeId } = await uploadFile(
+      file.buffer,
+      file.originalname,
+      "asset"
+    );
 
     // create new asset
     const newAsset = new Asset({
@@ -50,7 +54,11 @@ exports.listAsset = async (req, res) => {
     const savedAsset = await newAsset.save();
 
     // handle credentials if provided
-    const { username = null, password = null, notes = null } = req.body.credentials || {};
+    const {
+      username = null,
+      password = null,
+      notes = null,
+    } = req.body.credentials || {};
     if (username && password) {
       const encryptedData = {
         username: encrypt(username),
@@ -221,12 +229,16 @@ exports.updateAsset = async (req, res) => {
           .status(400)
           .json({ message: "unable to update this product" });
 
-      const deleteOldFile = await deleteFile(asset.image);
+      const deleteOldFile = await deleteFile(asset.image, "asset");
       if (!deleteOldFile)
         return res
           .status(400)
           .json({ message: "unable to update this product" });
-      const { nodeId } = await uploadFile(file.buffer, file.originalname, "asset");
+      const { nodeId } = await uploadFile(
+        file.buffer,
+        file.originalname,
+        "asset"
+      );
       newImage = nodeId;
     }
     newImage = newImage ? { image: newImage } : {};
@@ -337,13 +349,18 @@ exports.getAssetsStats = async (req, res) => {
 // Get stats and revenue of assets
 exports.assetsStats = async (req, res) => {
   try {
-    const [all, available, featured, sold,] = await Promise.all([
+    const [all, available, featured, sold] = await Promise.all([
       await Asset.countDocuments({}),
       await Asset.countDocuments({ status: "available" }),
       await Asset.countDocuments({ status: "featured" }),
       await Asset.countDocuments({ status: "sold" }),
     ]);
-    if ((!sold || !available || !all, !featured))
+    if (
+      typeof sold !== "number" ||
+      typeof available !== "number" ||
+      typeof all !== "number" ||
+      typeof featured !== "number"
+    )
       return res.status(400).json({ message: "Unable to load statistics" });
     res.status(200).json({ all, available, sold, featured });
   } catch (err) {
