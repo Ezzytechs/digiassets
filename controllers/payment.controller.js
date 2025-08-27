@@ -14,13 +14,8 @@ const calculateAssetDetailsCommand = require("../utils/commands/calculateAssets.
 
 exports.initPayment = async (req, res) => {
   try {
-    const { email, phone="NA", assets } = req.body;
-    if (
-      !email ||
-      !assets ||
-      !Array.isArray(assets) ||
-      assets.length === 0
-    ) {
+    const { email, phone = "NA", assets } = req.body;
+    if (!email || !assets || !Array.isArray(assets) || assets.length === 0) {
       return res
         .status(400)
         .json({ message: "Email and assets IDs are required" });
@@ -31,10 +26,12 @@ exports.initPayment = async (req, res) => {
     // Calculate total
     const { assetDetails, assetTotalAmount } =
       await calculateAssetDetailsCommand(assets, null);
+      const now = new Date();
+// console.log(); 
     //draft payment data
     const transactionData = {
       asset: [...assetDetails],
-      paymentReference: new Date(),
+      paymentReference: now.toLocaleString(),
       paymentDescription: `${assetTotalAmount} paid for digital assets`,
       totalAmount: assetTotalAmount,
       email,
@@ -42,7 +39,7 @@ exports.initPayment = async (req, res) => {
       userId: user?._id || null,
     };
     //init payment
-    const initPayment =await initializeTransaction(transactionData);
+    const initPayment = await initializeTransaction(transactionData);
     if (!initPayment)
       return res.status(400).json({
         message:
@@ -69,24 +66,26 @@ exports.verifyPament = async (req, res) => {
     if (checkTransaction)
       return res
         .status(200)
-        .json({ message: "Transaction verified successfully" });
-
+        .json({success:true, message: "Transaction verified successfully" });
+        
     //Verify payment on payment gateway
     const transaction = await verifyPayment(reference);
+    console.log(transaction);
     if (!transaction) {
       return res.status(400).json({ message: "Unable to verify transaction" });
     }
-   // check payment status
+    // check payment status
     if (transaction.paymentStatus !== "PAID") {
       return res.status(400).json({ message: "Transaction not successful" });
     }
 
     //Get transaction meta data from payment gateway
     const { asset, email, phone, paymentReference } = transaction.metaData;
-
     //calculate asset total amount on database
+    const assets=JSON.parse(asset);
+    console.log(assets)
     const { assetDetails, assetTotalAmount } =
-      await calculateAssetDetailsCommand(asset, null);
+      await calculateAssetDetailsCommand(assets, null);
     //compare the total amount of assets ordered with the amount paid in transaction
     if (assetTotalAmount < transaction.amountPaid)
       return res.status(400).json({
@@ -98,18 +97,19 @@ exports.verifyPament = async (req, res) => {
     const order = await placeOrderCommand({
       email,
       phone,
-      assets: asset,
+      assets,
       tnxReference: paymentReference,
       gatewayRef: reference,
-    }); 
+    });
     if (!order) {
       return res.status(400).json({ message: "Unable to place order" });
     }
     //email seller,
     //email buyer
     //email admin
-    res.status(201).json({success:true, message:order });
+    res.status(201).json({ success: true, message: order });
   } catch (err) {
+    console.log(err)
     res.status(500).json({ message: err.message });
   }
 };

@@ -97,8 +97,8 @@ exports.getUserRevenue = async (req, res) => {
         .status(400)
         .json({ message: "Unble to get the total credit for this user." });
     res.status(200).json({
-      creditRevenue: creditRevenue[0].total || 0,
-      debitRevenue: debitRevenue[0].total || 0,
+      creditRevenue: creditRevenue[0]?.total || 0,
+      debitRevenue: debitRevenue[0]?.total || 0,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

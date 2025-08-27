@@ -73,7 +73,7 @@ async function uploadFile(fileBuffer, fileName, folderName) {
   try {
     const storage = await initializeStorage();
     if (!storage) throw new Error("Unable to connect to storage!");
-
+// console.log(storage)
     const buffer = Buffer.isBuffer(fileBuffer)
       ? fileBuffer
       : Buffer.from(fileBuffer);
@@ -116,6 +116,7 @@ async function uploadFile(fileBuffer, fileName, folderName) {
 async function getFileStream(filename, folderName) {
   try {
     const storage = await initializeStorage();
+   
     if (!storage) throw new Error("Unable to connect to storage!");
 
     //Get the root storage mount
@@ -168,9 +169,7 @@ async function deleteFile(filename, folderName) {
     if (!file) {
       throw new Error("File not found in cover folder");
     }
-
-    const deleteF = await file.delete(true);
-    if (!deleteF) throw new Error("Unable to delete the file!");
+ await file.delete(true);
     return "File deleted successfully"; // Return success message
   } catch (error) {
     throw new Error(

@@ -39,7 +39,7 @@ const initializeTransaction = async (transactionData) => {
   try {
  const metaData = {
   totalAmount: totalAmount.toString(),
-  paymentReference: paymentReference.toString(),
+  paymentReference: paymentReference.toString()+"Hello",
   phone: phone.toString(),
   email: email,
   asset: typeof asset === "string" ? asset : JSON.stringify(asset),
@@ -49,8 +49,8 @@ const initializeTransaction = async (transactionData) => {
 const paymentData = {
       amount:totalAmount,
       customerName:"James Ezekiel",
-      customerEmail:"jameze49@gmail.com",
-      paymentReference:paymentReference.toString(),
+      customerEmail:email,
+      paymentReference:paymentReference.toString()+"HelloWorld",
       paymentDescription,
       currencyCode: "NGN",
       contractCode: MONNIFY_CONTRACT_CODE,
