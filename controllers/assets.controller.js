@@ -343,7 +343,10 @@ exports.assetsStats = async (req, res) => {
       await Asset.countDocuments({ status: "featured" }),
       await Asset.countDocuments({ status: "sold" }),
     ]);
-    if ((!sold || !available || !all, !featured))
+    if (typeof sold !== "number" ||
+  typeof available !== "number" ||
+  typeof all !== "number" ||
+  typeof featured !== "number")
       return res.status(400).json({ message: "Unable to load statistics" });
     res.status(200).json({ all, available, sold, featured });
   } catch (err) {
