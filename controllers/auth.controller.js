@@ -28,15 +28,15 @@ exports.register = async (req, res) => {
     const user = new User({
       ...req.body,
       password: hashedPassword,
-      isAdmin: true,
+      isAdmin: false,
     });
 
     const newUser = await user.save(); // save user in the session
     if(!newUser) return res.status(400).json({message:"Unable to register new user!"})
     // await user.save({ session }); // save user in the session
 
-    // const wallet = new Wallet({ owner: user._id });
-    // await wallet.save();
+     const wallet = new Wallet({ owner: user._id });
+     await wallet.save();
 
     // save wallet in same session
     // await new Wallet({ owner: user._id }).save({ session }); // save wallet in same session
