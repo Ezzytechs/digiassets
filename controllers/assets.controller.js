@@ -229,11 +229,11 @@ exports.updateAsset = async (req, res) => {
           .status(400)
           .json({ message: "unable to update this product" });
 
-      const deleteOldFile = await deleteFile(asset.image, "asset");
-      if (!deleteOldFile)
-        return res
-          .status(400)
-          .json({ message: "unable to update this product" });
+      // const deleteOldFile = await deleteFile(asset.image, "asset");
+      // if (!deleteOldFile)
+      //   return res
+      //     .status(400)
+      //     .json({ message: "unable to update this product" });
       const { nodeId } = await uploadFile(
         file.buffer,
         file.originalname,
