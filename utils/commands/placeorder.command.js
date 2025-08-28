@@ -69,7 +69,7 @@ const placeOrderCommand = async ({
 
       // Create transaction
       const transaction = new Transaction({
-        from: buyerId || null,
+        from: buyerId || "non-user",
         nonRegUser: !buyer ? { email, phone } : undefined,
         to: orderedAsset.seller,
         amount: orderedAsset.price,

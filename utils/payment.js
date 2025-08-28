@@ -50,7 +50,7 @@ const paymentData = {
       amount:totalAmount,
       customerName:"James Ezekiel",
       customerEmail:email,
-      paymentReference:paymentReference.toString()+"HelloWorld",
+      paymentReference:paymentReference.toString(),
       paymentDescription,
       currencyCode: "NGN",
       contractCode: MONNIFY_CONTRACT_CODE,
