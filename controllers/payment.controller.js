@@ -27,12 +27,13 @@ exports.initPayment = async (req, res) => {
     const { assetDetails, assetTotalAmount } =
       await calculateAssetDetailsCommand(assets, null);
       const now = new Date();
-// console.log(); 
+
     //draft payment data
     const transactionData = {
       asset: [...assetDetails],
       paymentReference: now.toLocaleString(),
       paymentDescription: `${assetTotalAmount} paid for digital assets`,
+      buyerName:`${user?.fName || email}`,
       totalAmount: assetTotalAmount,
       email,
       phone,
@@ -70,7 +71,6 @@ exports.verifyPament = async (req, res) => {
         
     //Verify payment on payment gateway
     const transaction = await verifyPayment(reference);
-    console.log(transaction);
     if (!transaction) {
       return res.status(400).json({ message: "Unable to verify transaction" });
     }
@@ -83,7 +83,6 @@ exports.verifyPament = async (req, res) => {
     const { asset, email, phone, paymentReference } = transaction.metaData;
     //calculate asset total amount on database
     const assets=JSON.parse(asset);
-    console.log(assets)
     const { assetDetails, assetTotalAmount } =
       await calculateAssetDetailsCommand(assets, null);
     //compare the total amount of assets ordered with the amount paid in transaction

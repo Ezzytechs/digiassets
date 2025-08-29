@@ -35,40 +35,27 @@ const initializeTransaction = async (transactionData) => {
     phone,
     paymentReference,
     paymentDescription,
+    buyerName,
   } = transactionData;
   try {
- const metaData = {
-  totalAmount: totalAmount.toString(),
-  paymentReference: paymentReference.toString()+"Hello",
-  phone: phone.toString(),
-  email: email,
-  asset: typeof asset === "string" ? asset : JSON.stringify(asset),
-};
-
-// console.log(transactionData)
-const paymentData = {
-      amount:totalAmount,
-      customerName:"James Ezekiel",
-      customerEmail:email,
-      paymentReference:paymentReference.toString(),
+    const metaData = {
+      totalAmount: totalAmount.toString(),
+      paymentReference: paymentReference.toString(),
+      phone: phone.toString(),
+      email,
+      asset: JSON.stringify(asset),
+    };
+    const paymentData = {
+      amount: totalAmount,
+      customerName: buyerName,
+      customerEmail: email,
+      paymentReference: paymentReference.toString(),
       paymentDescription,
       currencyCode: "NGN",
       contractCode: MONNIFY_CONTRACT_CODE,
       redirectUrl: `${credentials.siteURL}/verify-pay`,
       paymentMethods: ["CARD", "ACCOUNT_TRANSFER", "USSD"],
     };
-    // const paymentData = {
-    //   amount: totalAmount,
-    //   customerName: "James Ezekiel",
-    //   customerEmail: email,
-    //   paymentReference,
-    //   paymentDescription,
-    //   currencyCode: "NGN",
-    //   contractCode: MONNIFY_CONTRACT_CODE,
-    //   redirectUrl: `${credentials.siteURL}/verify-pay`,
-    //   paymentMethods: ["CARD", "ACCOUNT_TRANSFER", "USSD"],
-    // };
-
 
     const response = await axios.post(
       "https://sandbox.monnify.com/api/v1/merchant/transactions/init-transaction",
@@ -82,7 +69,7 @@ const paymentData = {
         },
       }
     );
-        console.log("Transfer Response:", response.data.responseBody);
+    console.log("Transfer Response:", response.data.responseBody);
     return response.data.responseBody;
   } catch (error) {
     console.error("Error creating transaction:", error);
