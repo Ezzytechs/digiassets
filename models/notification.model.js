@@ -11,6 +11,7 @@ const notificationSchema = new mongoose.Schema(
     to: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      required:false,
     },
     status: { type: String, enum: ["new", "seen"], default: "new" },
   },

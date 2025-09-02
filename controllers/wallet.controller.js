@@ -3,7 +3,7 @@ const Wallet = require("../models/wallet.model");
 // Get wallet balance
 exports.getWallet = async (req, res) => {
   try {
-    const wallet = await Wallet.findOne({ user: req.params.userId });
+    const wallet = await Wallet.findOne({ owner: req.user.userId });
     if (!wallet) return res.status(404).json({ message: "Wallet not found" });
     res.status(200).json(wallet);
   } catch (error) {
@@ -13,8 +13,10 @@ exports.getWallet = async (req, res) => {
 
 exports.updateWallet = async (req, res) => {
   try {
+    delete req?.body?.balance;
+    
     const updatedWallet = await Wallet.findOneAndUpdate(
-      { user: req.user.userId },
+      { owner: req.user.userId },
       { ...req.body },
       { new: true }
     );

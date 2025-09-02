@@ -1,11 +1,9 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const mongoose = require("mongoose");
 const { User } = require("../models/users.model");
 const Wallet = require("../models/wallet.model");
+const emailTemplate = require("../utils/mailer");
 const emailObserver = require("../utils/observers/email.observer");
-const { sendEmail } = require("../utils/mailer/mailer");
-const emailTemplate = require("../utils/mailer/templates");
 const credentials = require("../configs/credentials");
 
 exports.register = async (req, res) => {
@@ -21,9 +19,12 @@ exports.register = async (req, res) => {
           "Password must include at least one uppercase letter, one lowercase letter, one digit, one special character and be at least 6 characters long",
       });
     }
-   const userExit=await User.findOne({username:req.body.username})
-  
-   console.log(userExit)
+    const userExit = await User.findOne({ username: req.body.username });
+    if (userExit)
+      return res
+        .status(400)
+        .json({ message: "user with this usename already exit!" });
+
     const hashedPassword = await bcrypt.hash(req.body.password, 10);
     const user = new User({
       ...req.body,
@@ -31,36 +32,30 @@ exports.register = async (req, res) => {
       isAdmin: false,
     });
 
-    const newUser = await user.save(); // save user in the session
-    if(!newUser) return res.status(400).json({message:"Unable to register new user!"})
-    // await user.save({ session }); // save user in the session
+    const newUser = await user.save();
+    if (!newUser)
+      return res.status(400).json({ message: "Unable to register new user!" });
 
-     const wallet = new Wallet({ owner: user._id });
-     await wallet.save();
-
-    // save wallet in same session
-    // await new Wallet({ owner: user._id }).save({ session }); // save wallet in same session
-    // await session.commitTransaction();
-    // session.endSession();
+    const wallet = new Wallet({ owner: user._id });
+    await wallet.save();
 
     const { accessToken, refreshToken } = await newUser.generateAuthTokens();
 
     newUser.setRefreshTokenCookie(res, refreshToken);
 
-    // //send mail to new user
-    // emailObserver.emit("SEND_MAIL", {
-    //   to: user.email,
-    //   subject: `Welcome ${user.username}`,
-    //   templateFunc: () =>
-    //     emailTemplate.welcomeMessage(
-    //       user.username,
-    //       credentials.siteName,
-    //       credentials.loginURL,
-    //       credentials.supportEmail
-    //     ),
-    // });
-    res.status(201).json({ message: "Success", accessToken});
+    //send mail to new user
+    emailObserver.emit("SEND_MAIL", {
+      to: user.email,
+      subject: `Welcome ${user.username}`,
+      templateFunc: emailTemplate.registrationSuccessTemplate,
+      templateData: {
+        userName: user.username,
+        assetPageUrl: `${credentials.appUrl}/asets`,
+      },
+    });
+    res.status(201).json({ message: "Success", accessToken });
   } catch (err) {
+    console.log(err);
     if (err.code === 11000) {
       const fieldName = Object.keys(err.keyValue)[0];
       res
@@ -74,8 +69,8 @@ exports.register = async (req, res) => {
       );
       return res.status(400).json({ message: customMessage[0] });
     }
-   const mongooseErr=err.toString().split(":")[1]
-    return res.status(500).json({ message:mongooseErr});
+    const mongooseErr = err.toString().split(":")[1];
+    return res.status(500).json({ message: mongooseErr });
   }
 };
 
@@ -85,12 +80,21 @@ exports.login = async (req, res) => {
     if (!user || !bcrypt.compareSync(req.body.password, user.password)) {
       return res.status(400).json({ message: "Invalid Credentials" });
     }
-
     const { accessToken, refreshToken } = await user.generateAuthTokens();
     await user.setRefreshTokenCookie(res, refreshToken);
+    const time = new Date().toLocaleString();
+    const ip = req.ip;
 
+    emailObserver.emit("SEND_MAIL", {
+      to: user.email,
+      subject: "🔔 New Login Notification",
+      templateFunc: emailTemplate.loginNotificationTemplate,
+      templateData: { userName: user.username, ip, time },
+    });
+    
     return res.status(200).json({ accessToken, success: true });
-  } catch {
+  } catch (err) {
+    console.log(err);
     return res.status(500).json({ message: "Something went wrong" });
   }
 };
@@ -124,27 +128,29 @@ exports.generateOTP = async (req, res) => {
     if (!user) return res.status(400).json({ message: "Invalid Credentials" });
 
     const otp = Math.floor(100000 + Math.random() * 900000);
-    console.log(otp);
+
     const userOtp = {
       otpCode: otp,
       otpExpires: new Date(Date.now() + 10 * 60 * 1000),
-    }; // 10 min
-    user.otp=userOtp;
+    };
+    user.otp = userOtp;
     await user.save();
-    // console.log(otp);
-    // sendEmail(
-    //   user.email,
-    //   "Reset your password",
-    //   emailTemplate.forgotPassword(
-    //     user.stageName,
-    //     otp,
-    //     credentials.siteName,
-    //     credentials.supportEmail
-    //   )
-    // );
+
+    const mailData = {
+      userName: user.username,
+      otp: otp,
+    };
+
+    emailObserver.emit("SEND_MAIL", {
+      to: user.email,
+      subject: "🔔 Your OTP Code",
+      templateFunc: emailTemplate.otpTemplate,
+      templateData: mailData,
+    });
 
     return res.status(200).json({ message: "OTP has been sent" });
-  } catch {
+  } catch (err) {
+    console.log(err);
     return res.status(500).json({ message: "Something went wrong" });
   }
 };
@@ -153,7 +159,7 @@ exports.generateOTP = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { otp, password } = req.body;
-    Number(otp)
+    Number(otp);
     const user = await User.findOne({
       "otp.otpCode": otp,
       "otp.otpExpires": { $gt: new Date() },
@@ -163,7 +169,7 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired OTP" });
 
     user.password = await bcrypt.hash(password, 10);
-    user.otp = {otpCode:null, otpExpires:null}
+    user.otp = { otpCode: null, otpExpires: null };
     await user.save();
 
     return res.status(200).json({ message: "Password reset successfully" });
@@ -184,7 +190,7 @@ exports.changeEmail = async (req, res) => {
     await user.save();
 
     return res.status(200).json({ message: "Email changed successfully" });
-  } catch {
+  } catch (err) {
     return res.status(500).json({ message: "Something went wrong" });
   }
 };
@@ -206,7 +212,7 @@ exports.refreshToken = async (req, res) => {
 
       return res.status(200).json({ accessToken });
     });
-  } catch {
+  } catch (err) {
     return res.status(500).json({ message: "Something went wrong" });
   }
 };
@@ -216,7 +222,7 @@ exports.logout = (req, res) => {
   try {
     res.clearCookie("refreshToken");
     return res.status(200).json({ message: "Logged out successfully" });
-  } catch {
+  } catch (err) {
     return res.status(500).json({ message: "Something went wrong" });
   }
 };

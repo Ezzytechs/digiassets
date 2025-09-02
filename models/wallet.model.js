@@ -11,7 +11,7 @@ const walletSchema = new mongoose.Schema(
     accountDetails: {
       accountNumber: String,
       accountName: String,
-      BankName: String,
+      bankName: String,
       sortCode:{type:Number, default:0},
     },
     balance: {

@@ -41,11 +41,13 @@ exports.userNotificationsCounter = async (req, res) => {
 //Admin Notifications counter
 exports.adminNotificationsCounter = async (req, res) => {
   try {
-    const query = { event: "VIEWED" };
-    const notifications = await Notification.countDocuments({ ...query });
-    res.status(200).json(notifications);
+    const query = { event: { $in: ["VIEWED", "SUBMIT_CREDENTIALS"] } };
+
+    const notificationsCount = await Notification.countDocuments(query);
+
+    res.status(200).json({ count: notificationsCount });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -56,6 +58,10 @@ exports.getNotificationById = async (req, res) => {
     let notification = null;
     if (req.user.isAdmin) {
       notification = await Notification.findById(req.params.id);
+      if (notification.event === "VIEWED") {
+        notification.event = "COMFIRM_SUBMISSION";
+        await notification.save();
+      }
     } else {
       notification = await Notification.findOne({
         _id: req.params.id,

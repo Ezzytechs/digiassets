@@ -5,8 +5,7 @@ const orderSchema = new mongoose.Schema(
     buyer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: "non-user",
-      index: true,
+      required:false,
     },
     seller: {
       type: mongoose.Schema.Types.ObjectId,

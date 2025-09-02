@@ -3,8 +3,11 @@ const router = express.Router();
 const orderController = require("../controllers/order.controller");
 const {auth, admin} = require("../middlewares/auth/auth");
 
-// cancel order
+// cancel order user
 router.get("/cancel/:id", auth, orderController.cancelOrder);
+
+// cancel order -nonRegUser
+router.get("/cancel/non-user/mail", orderController.cancelOrderNonRegUser);
 
 // Get all orders (admin only)
 router.get("/", auth, admin, orderController.getAllOrders);

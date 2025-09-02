@@ -4,15 +4,20 @@ const Wallet = require("../models/wallet.model");
 const { User } = require("../models/users.model");
 const Category = require("../models/category.model");
 const Transaction = require("../models/transaction.model");
+const emailObserver = require("../utils/observers/email.observer");
 const {
   initializeTransaction,
   makeTransfer,
   verifyPayment,
+  convertUsdToNgn,
 } = require("../utils/payment");
 const placeOrderCommand = require("../utils/commands/placeorder.command");
 const calculateAssetDetailsCommand = require("../utils/commands/calculateAssets.command");
+const credentials = require("../configs/credentials");
+const emailTemplate = require("../utils/mailer");
 
 exports.initPayment = async (req, res) => {
+  let user = null;
   try {
     const { email, phone = "NA", assets } = req.body;
     if (!email || !assets || !Array.isArray(assets) || assets.length === 0) {
@@ -21,24 +26,25 @@ exports.initPayment = async (req, res) => {
         .json({ message: "Email and assets IDs are required" });
     }
     //get user details
-    const user = await User.findOne({ email });
+    user = await User.findOne({ email });
 
     // Calculate total
     const { assetDetails, assetTotalAmount } =
       await calculateAssetDetailsCommand(assets, null);
-      const now = new Date();
-
+    const now = new Date();
+    const amountToPay = await convertUsdToNgn(assetTotalAmount);
     //draft payment data
     const transactionData = {
       asset: [...assetDetails],
       paymentReference: now.toLocaleString(),
-      paymentDescription: `${assetTotalAmount} paid for digital assets`,
-      buyerName:`${user?.fName || email}`,
-      totalAmount: assetTotalAmount,
+      paymentDescription: `${amountToPay} paid for digital assets`,
+      buyerName: `${user?.fName || email}`,
+      totalAmount: amountToPay,
       email,
       phone,
       userId: user?._id || null,
     };
+
     //init payment
     const initPayment = await initializeTransaction(transactionData);
     if (!initPayment)
@@ -48,7 +54,28 @@ exports.initPayment = async (req, res) => {
       });
     res.status(200).json(initPayment);
   } catch (err) {
-    console.log(err);
+    emailObserver.emit("SEND_MAIL", {
+      to: credentials.adminName,
+      subject: "Payment initialization failed!",
+      templateFunc: emailTemplate.paymentFailedAdminTemplate,
+      templateData: {
+        adminName: credentials.adminName,
+        buyerName: user? user.username : "Not User",
+        buyerEmail: req.body.email,
+        failureReason: err.message || "Unknown reason",
+      },
+    });
+
+    emailObserver.emit("SEND_MAIL", {
+      to: req.body.email,
+      subject: "Payment failed!",
+      templateFunc: emailTemplate.paymentFailedBuyerTemplate,
+      templateData: {
+        buyerName: user? user.username : "Not user",
+        assetTitle: "Asset",
+        failureReason: "Error from payment server",
+      },
+    });
     res.status(500).json({ message: err.message });
   }
 };
@@ -67,8 +94,8 @@ exports.verifyPament = async (req, res) => {
     if (checkTransaction)
       return res
         .status(200)
-        .json({success:true, message: "Transaction verified successfully" });
-        
+        .json({ success: true, message: "Transaction verified successfully" });
+
     //Verify payment on payment gateway
     const transaction = await verifyPayment(reference);
     if (!transaction) {
@@ -82,14 +109,15 @@ exports.verifyPament = async (req, res) => {
     //Get transaction meta data from payment gateway
     const { asset, email, phone, paymentReference } = transaction.metaData;
     //calculate asset total amount on database
-    const assets=JSON.parse(asset);
+    const assets = JSON.parse(asset);
     const { assetDetails, assetTotalAmount } =
       await calculateAssetDetailsCommand(assets, null);
+       const amountToPay = await convertUsdToNgn(assetTotalAmount);
     //compare the total amount of assets ordered with the amount paid in transaction
-    if (assetTotalAmount < transaction.amountPaid)
+    if (amountToPay < transaction.amountPaid)
       return res.status(400).json({
         message: `Your payment remaining ${
-          assetTotalAmount - transaction.amountPaid
+          amountToPay - transaction.amountPaid
         } to balance. Contact Admin now`,
       });
 
@@ -103,12 +131,9 @@ exports.verifyPament = async (req, res) => {
     if (!order) {
       return res.status(400).json({ message: "Unable to place order" });
     }
-    //email seller,
-    //email buyer
-    //email admin
     res.status(201).json({ success: true, message: order });
   } catch (err) {
-    console.log(err)
+    console.log(err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -125,7 +150,7 @@ exports.MakeTransafer = async (req, res) => {
         .json({ message: "Credentials for this order is yet to be submitted" });
 
     //get asset details
-    const asset = await Asset.findById(order.assets.asset);
+    const asset = await Asset.findById(order.asset);
     if (!asset) return res.status(404).json({ message: "Asset not found" });
 
     //get user wallet

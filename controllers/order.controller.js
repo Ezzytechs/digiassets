@@ -1,50 +1,59 @@
 const Order = require("../models/orders.model");
 const { User } = require("../models/users.model");
-const  Wallet  = require("../models/wallet.model");
-const Transaction  = require("../models/transaction.model");
+const Wallet = require("../models/wallet.model");
+const Transaction = require("../models/transaction.model");
 const Credential = require("../models/credential.model");
+const Notification = require("../models/notification.model");
 const { encrypt, decrypt } = require("../utils/encryption");
 const { paginate } = require("../utils/pagination");
 const { makeTransfer } = require("../utils/payment");
 const emailObserver = require("../utils/observers/email.observer");
-const Notification = require("../models/notification.model");
+const emailTemplate = require("../utils/mailer");
+const credentials = require("../configs/credentials");
+
 //cancel order by id
 exports.cancelOrder = async (req, res) => {
   try {
     const { id } = req.params;
     //get the order
-    const order = await Order.findById(id).populate("asset");
+    const order = await Order.findById(id).populate("asset buyer seller");
     if (!order)
       return res
         .status(400)
         .json({ message: "Order with this ID did not exit" });
+
     //check if the login details has been provided
     if (order.status === "credentials_submitted")
       return res.status(400).json({
         message: "Credentials has been submitted by the seller",
       });
-    if (order.seller.toString() !== req.user.userId && order.buyer.toString() !== req.user.userId)
-      return res.status(403).json({ message: "You are not authorized to cancel this order" });
+    //check if buyer or seller cancelling the order
+    if (
+      order.seller.toString() !== req.user.userId &&
+      order.buyer.toString() !== req.user.userId
+    )
+      return res
+        .status(403)
+        .json({ message: "You are not authorized to cancel this order" });
 
     let deletedTransaction;
 
-    if (order.nonRegUser.email) {
-      // //send mail to new user
-      // emailObserver.emit("SEND_MAIL", {
-      //   to: order.nonRegUser.email,
-      //   subject: `Refund Notification`,
-      //   templateFunc: () =>
-      //     emailTemplate.welcomeMessage(
-      //       user.username,
-      //       credentials.siteName,
-      //       credentials.loginURL,
-      //       credentials.supportEmail
-      //     ),
-      // });
+    if (order.nonRegUser?.email) {
+      //send mail to buyer or seller cancelled order, ordered by non reg user
+      emailObserver.emit("SEND_MAIL", {
+        to: order.nonRegUser?.email,
+        subject: `Refund Notification`,
+        templateFunc: emailTemplate.oderCancelledNonRegUserTemplate,
+        templateData: {
+          buyerName: order.nonRegUser?.email,
+          amount: order.price,
+          refundEmail: credentials.email,
+        },
+      });
 
       deletedTransaction = await Transaction.findOneAndDelete({
         to: order.seller,
-        "nonRegUser.email": order.nonRegUser.email,
+        "nonRegUser.email": order.nonRegUser?.email,
         gatewayRef: order.payRef,
       });
     } else {
@@ -78,31 +87,97 @@ exports.cancelOrder = async (req, res) => {
         gatewayRef: order.payRef,
         from: order.buyer,
       });
-    }
-    if (!deletedTransaction)
-      return res
-        .status(400)
-        .json({ message: "Unable to delete the transaction" });
+      if (!deletedTransaction)
+        return res
+          .status(400)
+          .json({ message: "Unable to delete the transaction" });
 
+      //send mail to buyer
+      emailObserver.emit("SEND_MAIL", {
+        to: buyer.email,
+        subject: "Refund Notification",
+        templateFunc: emailTemplate.orderCancelledBuyerTemplate,
+        templateData: { buyerName: buyer.username, amount: order.price },
+      });
+    }
     order.status = "cancelled";
     await order.save();
-    //send mail to new user
-    // emailObserver.emit("SEND_MAIL", {
-    //   to: order.nonRegUser.email,
-    //   subject: `Refund Successful`,
-    //   templateFunc: () =>
-    //     emailTemplate.welcomeMessage(
-    //       user.username,
-    //       credentials.siteName,
-    //       credentials.loginURL,
-    //       credentials.supportEmail
-    //     ),
-    // });
+
+    //email sender
+    emailObserver.emit("SEND_MAIL", {
+      to: seller.email,
+      subject: "Order Cancelled",
+      templateFunc: emailTemplate.orderCancelledSellerTemplate,
+      templateData: { sellerName: seller.username },
+    });
+
+    emailObserver.emit("SEND_MAIL", {
+      to: credentials.siteEmail,
+      subject: "Order Cancelled",
+      templateFunc: emailTemplate.orderCancelledAdminTemplate,
+      templateData: {
+        buyerName: order.buyer?.username,
+        sellerName: seller.username,
+        amount: order.price,
+        reason: "Unknown",
+        orderId: order._id,
+      },
+    });
 
     res.status(200).json({ order, message: "Refund successful" });
   } catch (err) {
     // console.log(err)
     res.status(500).json({ message: err.message });
+  }
+};
+
+//cancelled order for non reg user
+exports.cancelOrderNonRegUser = async () => {
+  try {
+    const { email, id } = req.query;
+    const order = await Order.findOne({ "nonRegUser.email": email, _id: id });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (order.status === "credentials_submitted")
+      return res
+        .status(403)
+        .json({ message: "Credentials has been submitted for this order" });
+    const seller = await User.findById(order.seller);
+    if (!seller) res.status(404).json({ message: "Seller not found" });
+    emailObserver.emit("SEND_MAIL", {
+      to: seller.email,
+      subject: "Order Cancelled",
+      templateFunc: emailTemplate.orderCancelledSellerTemplate,
+      templateData: { sellerName: seller.username },
+    });
+    //send mail to buyer or seller cancelled order, ordered by non reg user
+    emailObserver.emit("SEND_MAIL", {
+      to: order.nonRegUser?.email,
+      subject: `Refund Notification`,
+      templateFunc: emailTemplate.oderCancelledNonRegUserTemplate,
+      templateData: {
+        buyerName: order.nonRegUser?.email,
+        amount: order.price,
+        refundEmail: credentials.email,
+      },
+    });
+
+    emailObserver.emit("SEND_MAIL", {
+      to: credentials.siteEmail,
+      subject: "Order Cancelled",
+      templateFunc: emailTemplate.orderCancelledAdminTemplate,
+      templateData: {
+        sellerName: seller.username,
+        orderId: order._id,
+        amount: order.price,
+        reason: "Unknown",
+      },
+    });
+
+    order.status = "cancelled";
+    await order.save();
+    res.status(200).json({ message: "Order cancelled succesfully" });
+  } catch (error) {
+    return res.status(500).json({ message: "Something went wrong" });
   }
 };
 
@@ -193,7 +268,8 @@ exports.submitCredentials = async (req, res) => {
     const order = await Order.findOne({
       _id: orderId,
       seller: req.user.userId,
-    });
+    }).populate("asset seller buyer");
+
     if (!order)
       return res
         .status(404)
@@ -227,14 +303,17 @@ exports.submitCredentials = async (req, res) => {
         return res.status(404).json({
           message: "Unable to save the credentials, Please try again",
         });
+      //update order status
       order.status = "credentials_submitted";
       order.credentialsSubmittedAt = new Date();
       await order.save();
-      const notification = await Notification.findOneAndUpdate(
+      const buyer = order.nonRegUser?.email ? {} : { to: order.buyer._id };
+      //update notification
+      const updateNotification = await Notification.findOneAndUpdate(
         { orderId },
-        { stauts: "new", to: order.buyer, event: "SUBMIT_CREDENTIALS" }
+        { status: "new", ...buyer, event: "SUBMIT_CREDENTIALS" }
       );
-      if (!notification)
+      if (!updateNotification)
         return res
           .status(404)
           .json({ message: "Unable to submit credentials" });
@@ -242,9 +321,43 @@ exports.submitCredentials = async (req, res) => {
 
     if (order?.nonRegUser) {
       //send email to the non registerd user with the credentials
+      emailObserver.emit("SEND_MAIL", {
+        to: order.nonRegUser?.email,
+        subject: "Your Ordered Asset Credentials",
+        templateFunc: emailTemplate.credentialsSubmittedNonRegUserTemplate,
+        templateData: {
+          sellerName: order.seller.username,
+          assetTitle: order.asset?.title,
+          loginName: req.body?.username,
+          password: req.body?.password,
+          note: req.body?.note || "NA",
+        },
+      });
+    } else {
+      emailObserver.emit("SEND_MAIL", {
+        to: order.buyer?.email,
+        subject: "Your Ordered Asset Credentials",
+        templateFunc: emailTemplate.credentialsSubmittedTemplate,
+        templateData: {
+          userName: order.user?.username,
+          assetTitle: order.asset?.title,
+          orderViewUrl: `${credentials.orderViewPage}/${order._id}/view`,
+        },
+      });
     }
-    if (!order) return res.status(404).json({ message: "Order not found" });
-
+    emailObserver.emit("SEND_MAIL", {
+      to: credentials.siteEmail,
+      subject: "Order Credentials Submiited ",
+      templateFunc: emailTemplate.credentialsSubmittedAdminTemplate,
+      templateData: {
+        adminName: credentials.adminName,
+        buyerName: order.buyer?.username || "Not User",
+        buyerEmail: order.buyer?.username || order.nonRegUser.email,
+        assetTitle: order.asset?.title,
+        sellerName: order.seller.username,
+        viewUrl: `${credentials.orderViewPageAdmin}/${order._id}/view`,
+      },
+    });
     return res
       .status(200)
       .json({ message: "Credentials submitted successfully" });

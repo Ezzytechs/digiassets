@@ -1,8 +1,9 @@
 const axios = require("axios");
 require("dotenv").config();
 const credentials = require("../configs/credentials");
-const { MONNIFY_API_KEY, MONNIFY_SECRET_KEY, MONNIFY_CONTRACT_CODE } =
+const { MONNIFY_API_KEY, MONNIFY_SECRET_KEY, MONNIFY_CONTRACT_CODE, API_KEY } =
   process.env;
+
 const authenticateMonnify = async () => {
   const authString = Buffer.from(
     `${MONNIFY_API_KEY}:${MONNIFY_SECRET_KEY}`
@@ -53,7 +54,7 @@ const initializeTransaction = async (transactionData) => {
       paymentDescription,
       currencyCode: "NGN",
       contractCode: MONNIFY_CONTRACT_CODE,
-      redirectUrl: `${credentials.siteURL}/verify-pay`,
+      redirectUrl: `${credentials.appUrl}/verify-pay`,
       paymentMethods: ["CARD", "ACCOUNT_TRANSFER", "USSD"],
     };
 
@@ -159,9 +160,29 @@ const getMonnifyBanks = async () => {
   }
 };
 
+async function convertUsdToNgn(usdAmount) {
+  const API_URL = `https://api.currencyfreaks.com/v2.0/rates/latest?apikey=${API_KEY}&symbols=NGN`;
+  try {
+    const response = await axios.get(API_URL);
+
+    const rate = parseFloat(response.data.rates.NGN);
+    if (isNaN(rate)) {
+      throw new Error("Invalid NGN rate from API");
+    }
+
+    const convertedAmount =Math.round(usdAmount * rate);
+  
+    return convertedAmount;
+  } catch (error) {
+    console.error("Currency conversion error:", error.message);
+    throw error;
+  }
+}
+
 module.exports = {
   initializeTransaction,
   makeTransfer,
   verifyPayment,
   getMonnifyBanks,
+  convertUsdToNgn
 };

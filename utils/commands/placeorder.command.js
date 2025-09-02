@@ -4,6 +4,9 @@ const Transaction = require("../../models/transaction.model");
 const Asset = require("../../models/assets.model");
 const Notification = require("../../models/notification.model");
 const Credential = require("../../models/credential.model");
+const emailObserver = require("../observers/email.observer");
+const credentials = require("../../configs/credentials");
+const emailTemplate = require("../mailer");
 
 const placeOrderCommand = async ({
   email,
@@ -30,7 +33,7 @@ const placeOrderCommand = async ({
     // Process assets one by one
     for (let i = 0; i < assets.length; i++) {
       const assetId = assets[i];
-      const orderedAsset = await Asset.findById(assetId);
+      const orderedAsset = await Asset.findById(assetId).populate("seller");
       if (!orderedAsset) throw new Error("Asset not found");
 
       // Create order
@@ -66,10 +69,10 @@ const placeOrderCommand = async ({
       // Mark asset as sold
       orderedAsset.status = "sold";
       await orderedAsset.save();
-
+      const from = buyerId ? { from: buyerId } : null;
       // Create transaction
       const transaction = new Transaction({
-        from: buyerId || "non-user",
+        ...from,
         nonRegUser: !buyer ? { email, phone } : undefined,
         to: orderedAsset.seller,
         amount: orderedAsset.price,
@@ -79,6 +82,46 @@ const placeOrderCommand = async ({
         gatewayRef,
       });
       await transaction.save();
+
+      //email seller,
+      emailObserver.emit("SEND_MAIL", {
+        to: orderedAsset.seller?.email,
+        subject: "Order Successfull",
+        templateFunc: emailTemplate.orderSuccessfullSellerTemplate,
+        templateData: {
+          sellerName: orderedAsset.seller.username,
+          buyerName: buyer ? buyer.username : email,
+          price: orderedAsset.price,
+          assetTitle: orderedAsset.title,
+          dashboardUrl:credentials.dashboardurl
+        },
+      });
+
+      //email buyer
+      emailObserver.emit("SEND_MAIL", {
+        to: email,
+        subject: "New Asset Purchase",
+        templateFunc: emailTemplate.orderSuccessfullBuyerTemplate,
+        templateData: {
+          buyerName: buyer ? buyer.username : email,
+          assetTitle: orderedAsset.title,
+          price: orderedAsset.price,
+        },
+      });
+
+      //email admin
+      emailObserver.emit("SEND_MAIL", {
+        to: credentials.siteEmail,
+        subject: "New Asset Purchase",
+        templateFunc: emailTemplate.orderSuccessfullAdminTemplate,
+        templateData: {
+          buyerName: buyer ? buyer.username : "Not User",
+          sellerName: orderedAsset.seller?.username,
+          assetTitle: orderedAsset.title,
+          price: orderedAsset.price,
+          dashboardUrl: credentials.dashboardurlAdmin,
+        },
+      });
     }
 
     return "Order placed successfully!";
