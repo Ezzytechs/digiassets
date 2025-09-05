@@ -123,7 +123,6 @@ const placeOrderCommand = async ({
         },
       });
     }
-
     return "Order placed successfully!";
   } catch (err) {
     console.error(err);

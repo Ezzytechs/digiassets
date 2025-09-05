@@ -6,6 +6,7 @@ const {
   credentialsSubmittedTemplate,
 } = require("./templates/credentialsSubmittedTemplate.js");
 const { otpTemplate } = require("./templates/otpTemplate.js");
+const {otpRegistrationTemplate} = require("./templates/otpRegistrationTemplate.js")
 const {
   passwordChangedTemplate,
 } = require("./templates/passwordChangedTemplate.js");
@@ -59,6 +60,7 @@ module.exports = {
   credentialsSubmittedNonRegUserTemplate,
   credentialsSubmittedAdminTemplate,
   otpTemplate,
+  otpRegistrationTemplate,
   passwordChangedTemplate,
   loginNotificationTemplate,
   adminPaymentToSellerTemplate,
