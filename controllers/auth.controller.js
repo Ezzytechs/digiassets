@@ -29,7 +29,7 @@ exports.sendRegOtp = async (req, res) => {
         templateData: mailData,
       });
       return res.status(200).json({success:true})
-    }
+    }else{
     const existingEmial = await User.findOne({ email });
     if (existingEmial)
       return res
@@ -65,6 +65,7 @@ exports.sendRegOtp = async (req, res) => {
     });
 
     res.status(200).json({ message: "OTP sent successfully", email });
+    }
   } catch (error) {
     console.error("Error sending OTP:", error);
     res.status(500).json({ error: "Failed to send OTP" });
