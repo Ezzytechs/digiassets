@@ -55,7 +55,7 @@ exports.initPayment = async (req, res) => {
     res.status(200).json(initPayment);
   } catch (err) {
     emailObserver.emit("SEND_MAIL", {
-      to: credentials.siteEmail,
+      to: credentials.adminName,
       subject: "Payment initialization failed!",
       templateFunc: emailTemplate.paymentFailedAdminTemplate,
       templateData: {

@@ -3,12 +3,6 @@ const router = express.Router();
 const {auth} = require("../middlewares/auth/auth");
 const authController = require("../controllers/auth.controller");
 
-//registration otp
-router.post("/register-otp", authController.sendRegOtp);
-
-//verify registration otp
- router.post("/verify-registration", authController.verifyRegOtp)
-
 //register user
 router.post("/register", authController.register);
 

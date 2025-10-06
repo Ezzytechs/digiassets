@@ -2,9 +2,8 @@ require("dotenv").config();
 const {SITE_EMAIL, SITE_SUPPORT_EMAIL, SITE_PHONE} = process.env;
 
 //frontend url
-const siteURL="https://digiassets-flax.vercel.app";
-// "http://localhost:3000"
-
+const siteURL="http://localhost:3000"
+//"https://digiassets-flax.vercel.app";
 
 const credentials={
     siteEmail:SITE_EMAIL,
