@@ -9,6 +9,12 @@ router.get("/cancel/:id", auth, orderController.cancelOrder);
 // cancel order -nonRegUser
 router.get("/cancel/non-user/mail", orderController.cancelOrderNonRegUser);
 
+// report order user
+router.get("/cancel/:id", auth, orderController.markFakeOrder);
+
+// report order -nonRegUser
+router.get("/cancel/:id/:email", auth, orderController.nonRegUsermarkFakeOrder);
+
 // Get all orders (admin only)
 router.get("/", auth, admin, orderController.getAllOrders);
 
@@ -38,5 +44,7 @@ router.get("/user/sales-stats/:userId", auth, orderController.getUserSalesStats)
 
 // Get user orders (authenticated user)
 router.get("/user/orders-stats/:userId", auth, orderController.getUserOrderStats);
+
+router.get("/user/stats/:userId", orderController.getUserOrderStats);
 
 module.exports = router;

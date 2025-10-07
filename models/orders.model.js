@@ -23,7 +23,7 @@ const orderSchema = new mongoose.Schema(
     payRef: String,
     status: {
       type: String,
-      enum: ["paid", "credentials_submitted", "cancelled", "completed"],
+      enum: ["paid", "credentials_submitted", "cancelled", "fake", "completed"],
       default: "paid",
     },
     credentialsSubmittedAt: { type: Date },

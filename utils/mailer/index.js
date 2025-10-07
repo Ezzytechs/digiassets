@@ -29,7 +29,9 @@ const {
 const {
   oderCancelledNonRegUserTemplate,
 } = require("./templates/orderCancelledNonRegUser.js");
-
+const {orderReportedAdminTemplate} = require("./templates/orderReportedAdminTemplate.js")
+const {orderReportedBuyerTemplate} = require("./templates/orderReportedBuyerTemplate.js")
+const {orderReportedSellerTemplate} = require("./templates/orderReportedSellerTemplate.js")
 const {
   orderSuccessfullBuyerTemplate,
 } = require("./templates/orderSuccessfullBuyerTemplate.js");
@@ -69,6 +71,9 @@ module.exports = {
   paymentFailedAdminTemplate,
   paymentFailedBuyerTemplate,
   orderCancelledBuyerTemplate,
+  orderReportedAdminTemplate,
+  orderReportedBuyerTemplate,
+  orderReportedSellerTemplate,
   orderSuccessfullAdminTemplate,
   orderSuccessfullBuyerTemplate,
   orderSuccessfullSellerTemplate,

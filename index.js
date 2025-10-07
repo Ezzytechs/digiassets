@@ -16,7 +16,7 @@ const paymentRoutes = require("./routes/payment.routes");
 const transactionRoutes = require("./routes/transactions.routes");
 const platformRoutes = require("./routes/platform.routes");
 const notificationRoutes = require("./routes/notification.routes");
-
+const cartRoutes=require("./routes/cart.routes")
 const app = express();
 
 // Middleware
@@ -45,6 +45,7 @@ app.use(`/${apiVersion}/payment`, paymentRoutes);
 app.use(`/${apiVersion}/transactions`, transactionRoutes);
 app.use(`/${apiVersion}/platforms`, platformRoutes);
 app.use(`/${apiVersion}/notifications`, notificationRoutes);
+app.use(`/${apiVersion}/cart`, cartRoutes);
 
 // Start server
 app.listen(PORT, () => {

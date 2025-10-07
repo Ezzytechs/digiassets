@@ -1,12 +1,9 @@
 const Order = require("../models/orders.model");
 const { User } = require("../models/users.model");
-const Wallet = require("../models/wallet.model");
-const Transaction = require("../models/transaction.model");
 const Credential = require("../models/credential.model");
 const Notification = require("../models/notification.model");
 const { encrypt, decrypt } = require("../utils/encryption");
 const { paginate } = require("../utils/pagination");
-const { makeTransfer } = require("../utils/payment");
 const emailObserver = require("../utils/observers/email.observer");
 const emailTemplate = require("../utils/mailer");
 const credentials = require("../configs/credentials");
@@ -20,7 +17,7 @@ exports.cancelOrder = async (req, res) => {
     if (!order)
       return res
         .status(400)
-        .json({ message: "Order with this ID did not exit" });
+        .json({ message: "Order with this ID does not exit" });
 
     //check if the login details has been provided
     if (order.status === "credentials_submitted")
@@ -29,14 +26,12 @@ exports.cancelOrder = async (req, res) => {
       });
     //check if buyer or seller cancelling the order
     if (
-      order.seller.toString() !== req.user.userId &&
-      order.buyer.toString() !== req.user.userId
+      order.seller?._id.toString() !== req.user.userId &&
+      order.buyer._id.toString() !== req.user.userId
     )
       return res
         .status(403)
         .json({ message: "You are not authorized to cancel this order" });
-
-    let deletedTransaction;
 
     if (order.nonRegUser?.email) {
       //send mail to buyer or seller cancelled order, ordered by non reg user
@@ -50,65 +45,25 @@ exports.cancelOrder = async (req, res) => {
           refundEmail: credentials.email,
         },
       });
-
-      deletedTransaction = await Transaction.findOneAndDelete({
-        to: order.seller,
-        "nonRegUser.email": order.nonRegUser?.email,
-        gatewayRef: order.payRef,
-      });
-    } else {
-      //Get the buyer wallet for refund
-      const buyerWallet = await Wallet.findOne({ user: order.buyer });
-      if (!buyerWallet)
-        return res.status(400).json({ message: "Buyer does not have wallet" });
-      //check if the wallet has the neccessary credentials
-      if (
-        !buyerWallet.accountDetails.sortCode ||
-        !buyerWallet.accountDetails.bankName
-      )
-        return res
-          .status(400)
-          .json({ message: "buyer wallet missing important credentials" });
-      //construct the transfer details
-      const transferDetails = {
-        amount: order.price,
-        reference: `refund to ${buyerWallet.accountDetails.accountNumber} for ${order.asset._id}`,
-        narration: "Refund",
-        destinationBankCode: buyerWallet.accountDetails.sortCode,
-        destinationAccountNumber: buyerWallet.accountDetails.accountNumber,
-      };
-      const refundBuyer = await makeTransfer(transferDetails);
-      if (!refundBuyer)
-        return res.status(400).json({
-          message: "Unable to refund buyer. Please try again after sometimes.",
-        });
-      deletedTransaction = await Transaction.findOneAndDelete({
-        to: order.seller,
-        gatewayRef: order.payRef,
-        from: order.buyer,
-      });
-      if (!deletedTransaction)
-        return res
-          .status(400)
-          .json({ message: "Unable to delete the transaction" });
-
-      //send mail to buyer
-      emailObserver.emit("SEND_MAIL", {
-        to: buyer.email,
-        subject: "Refund Notification",
-        templateFunc: emailTemplate.orderCancelledBuyerTemplate,
-        templateData: { buyerName: buyer.username, amount: order.price },
-      });
     }
+
     order.status = "cancelled";
     await order.save();
 
     //email sender
     emailObserver.emit("SEND_MAIL", {
-      to: seller.email,
+      to: order.seller?.email,
       subject: "Order Cancelled",
       templateFunc: emailTemplate.orderCancelledSellerTemplate,
       templateData: { sellerName: seller.username },
+    });
+
+    //send mail to buyer
+    emailObserver.emit("SEND_MAIL", {
+      to: order.buyer?.email,
+      subject: "Refund Notification",
+      templateFunc: emailTemplate.orderCancelledBuyerTemplate,
+      templateData: { buyerName: buyer.username, amount: order.price },
     });
 
     emailObserver.emit("SEND_MAIL", {
@@ -135,20 +90,23 @@ exports.cancelOrder = async (req, res) => {
 exports.cancelOrderNonRegUser = async () => {
   try {
     const { email, id } = req.query;
-    const order = await Order.findOne({ "nonRegUser.email": email, _id: id });
+    const order = await Order.findOne({
+      "nonRegUser.email": email,
+      _id: id,
+    }).populate("seller");
     if (!order) return res.status(404).json({ message: "Order not found" });
     if (order.status === "credentials_submitted")
       return res
         .status(403)
         .json({ message: "Credentials has been submitted for this order" });
-    const seller = await User.findById(order.seller);
-    if (!seller) res.status(404).json({ message: "Seller not found" });
+
     emailObserver.emit("SEND_MAIL", {
-      to: seller.email,
+      to: order.seller?.email,
       subject: "Order Cancelled",
       templateFunc: emailTemplate.orderCancelledSellerTemplate,
       templateData: { sellerName: seller.username },
     });
+
     //send mail to buyer or seller cancelled order, ordered by non reg user
     emailObserver.emit("SEND_MAIL", {
       to: order.nonRegUser?.email,
@@ -161,6 +119,7 @@ exports.cancelOrderNonRegUser = async () => {
       },
     });
 
+    //mail admin
     emailObserver.emit("SEND_MAIL", {
       to: credentials.siteEmail,
       subject: "Order Cancelled",
@@ -178,6 +137,179 @@ exports.cancelOrderNonRegUser = async () => {
     res.status(200).json({ message: "Order cancelled succesfully" });
   } catch (error) {
     return res.status(500).json({ message: "Something went wrong" });
+  }
+};
+
+// Report order
+exports.markFakeOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get the order with relations
+    const order = await Order.findOne({
+      _id: id,
+      buyer: req.user.userId,
+    }).populate("asset buyer seller");
+
+    if (!order)
+      return res
+        .status(400)
+        .json({
+          message: "Order with the provided credentials does not exist",
+        });
+
+    // Check if credentials were submitted
+    if (order.status !== "credentials_submitted") {
+      return res.status(400).json({
+        message: "Credentials have not been submitted by the seller",
+      });
+    }
+
+    // Mark order as fake
+    order.status = "fake";
+    await order.save();
+
+    const { asset, buyer, seller, _id, price } = order;
+
+    // === Send Emails ===
+
+    // 1️⃣ Send to Seller
+    emailObserver.emit("SEND_MAIL", {
+      to: order.seller?.email,
+      subject: "Your Sale Has Been Reported as Fake",
+      templateFunc: emailTemplate.orderReportedSellerTemplate,
+      templateData: {
+        sellerName: seller?.username || "Seller",
+        orderId: _id,
+        assetTitle: asset?.title || "Unknown Asset",
+        amount: price,
+        reportDate: new Date().toLocaleDateString(),
+        submitCredentialsUrl: `${process.env.CLIENT_URL}/seller/orders/${_id}/submit-credentials`,
+        supportUrl: `${process.env.CLIENT_URL}/support`,
+      },
+    });
+
+    // 2️⃣ Send to Buyer
+    emailObserver.emit("SEND_MAIL", {
+      to: order.buyer?.email,
+      subject: "Your Report Has Been Received",
+      templateFunc: emailTemplate.orderReportedBuyerTemplate,
+      templateData: {
+        buyerName: buyer?.username || "Buyer",
+        orderId: _id,
+        assetTitle: asset?.title || "Unknown Asset",
+        amount: price,
+        reportDate: new Date().toLocaleDateString(),
+        supportUrl: `${process.env.CLIENT_URL}/support`,
+      },
+    });
+
+    // 3️⃣ Send to Admin
+    emailObserver.emit("SEND_MAIL", {
+      to: credentials.siteEmail,
+      subject: "Order Reported as Fake",
+      templateFunc: emailTemplate.orderReportedAdminTemplate,
+      templateData: {
+        adminName: "Admin",
+        orderId: _id,
+        buyerName: buyer?.username || "Buyer",
+        sellerName: seller?.username || "Seller",
+        assetTitle: asset?.title || "Unknown Asset",
+        amount: price,
+        reportReason: "Buyer reported this order as fake.",
+        reportDate: new Date().toLocaleDateString(),
+        adminDashboardUrl: `${process.env.CLIENT_URL}/admin/orders/${_id}`,
+      },
+    });
+
+    // Success response
+    res.status(200).json({
+      order,
+      message: "Order reported successfully and notifications sent.",
+    });
+  } catch (err) {
+    console.error("Error reporting order:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+//Report order -nonRegUser
+exports.nonRegUsermarkFakeOrder = async (req, res) => {
+  try {
+    const { id, email } = req.params;
+    //get the order
+    const order = await Order.findOne({
+      _id: id,
+      "nonRegUser.email": email,
+    }).populate("asset seller");
+    if (!order)
+      return res
+        .status(400)
+        .json({ message: "Order with this ID does not exit" });
+
+    //check if the login details has been provided
+    if (!order.status === "credentials_submitted")
+      return res.status(400).json({
+        message: "Credentials has not been submitted by the seller",
+      });
+
+    order.status = "fake";
+    await order.save();
+
+    // === Send Emails ===
+
+    // 1️⃣ Send to Seller
+    emailObserver.emit("SEND_MAIL", {
+      to: order.seller?.email,
+      subject: "Your Sale Has Been Reported as Fake",
+      templateFunc: emailTemplate.orderReportedSellerTemplate,
+      templateData: {
+        sellerName: seller?.username || "Seller",
+        orderId: _id,
+        assetTitle: asset?.title || "Unknown Asset",
+        amount: price,
+        reportDate: new Date().toLocaleDateString(),
+        submitCredentialsUrl: `${process.env.CLIENT_URL}/seller/orders/${_id}/submit-credentials`,
+        supportUrl: `${process.env.CLIENT_URL}/support`,
+      },
+    });
+
+    // 2️⃣ Send to Buyer
+    emailObserver.emit("SEND_MAIL", {
+      to: order.nonRegUser?.email,
+      subject: "Your Report Has Been Received",
+      templateFunc: emailTemplate.orderReportedBuyerTemplate,
+      templateData: {
+        buyerName: buyer?.username || "Buyer",
+        orderId: _id,
+        assetTitle: asset?.title || "Unknown Asset",
+        amount: price,
+        reportDate: new Date().toLocaleDateString(),
+        supportUrl: `${process.env.CLIENT_URL}/support`,
+      },
+    });
+
+    // 3️⃣ Send to Admin
+    emailObserver.emit("SEND_MAIL", {
+      to: credentials.siteEmail,
+      subject: "Order Reported as Fake",
+      templateFunc: emailTemplate.orderReportedAdminTemplate,
+      templateData: {
+        adminName: "Admin",
+        orderId: _id,
+        buyerName: buyer?.username || "Buyer",
+        sellerName: seller?.username || "Seller",
+        assetTitle: asset?.title || "Unknown Asset",
+        amount: price,
+        reportReason: "Buyer reported this order as fake.",
+        reportDate: new Date().toLocaleDateString(),
+        adminDashboardUrl: `${process.env.CLIENT_URL}/admin/orders/${_id}`,
+      },
+    });
+    res.status(200).json({ order, message: "Order reported successfully" });
+  } catch (err) {
+    // console.log(err)
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -250,8 +382,16 @@ exports.getOrderById = async (req, res) => {
     const order = await Order.findById(req.params.id).populate([
       { path: "seller", select: "username email phone address" },
       { path: "buyer", select: "username email phone address" },
-      { path: "asset", select: "-updatedAt" },
+      {
+        path: "asset",
+        select: "-updatedAt -status",
+        populate: [
+          { path: "category", select: "name" },
+          { path: "platform", select: "name" },
+        ],
+      },
     ]);
+
     if (!order) return res.status(404).json({ message: "Order not found" });
     res.status(200).json(order);
   } catch (err) {
@@ -282,7 +422,7 @@ exports.submitCredentials = async (req, res) => {
       encrypted: true,
     };
 
-    if (order.status === "credentials_submitted") {
+    if (order.status === "credentials_submitted" || order.status === "fake") {
       const updateExistingCredential = await Credential.findOneAndUpdate(
         { orderId },
         {
@@ -293,6 +433,9 @@ exports.submitCredentials = async (req, res) => {
         return res.status(404).json({
           message: "Unable to update your credentials. Please try again later",
         });
+
+      //mail buyer
+      //mail admin
     } else {
       const credentials = new Credential({
         credentials: { ...encryptedData },
@@ -307,6 +450,7 @@ exports.submitCredentials = async (req, res) => {
       order.status = "credentials_submitted";
       order.credentialsSubmittedAt = new Date();
       await order.save();
+
       const buyer = order.nonRegUser?.email ? {} : { to: order.buyer._id };
       //update notification
       const updateNotification = await Notification.findOneAndUpdate(
@@ -409,7 +553,7 @@ exports.getDecryptedCredentials = async (req, res) => {
     );
     if (!notification)
       return res.status(404).json({ message: "Unable to submit credentials" });
-
+    // order.status="credentials_viewed";
     return res.status(200).json({ credentials });
   } catch (err) {
     console.error(err);
@@ -530,5 +674,31 @@ exports.getUserOrderStats = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+// GET order stats for details
+exports.getUserOrderStats = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    // Run all counts in parallel
+    const [totalOrders, completedOrders, fakeOrders] = await Promise.all([
+      Order.countDocuments({ seller: userId }),
+      Order.countDocuments({ seller: userId, status: "completed" }),
+      Order.countDocuments({ seller: userId, status: "fake" }),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalOrders,
+        completedOrders,
+        fakeOrders,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching order stats:", error);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };

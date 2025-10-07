@@ -1,0 +1,2 @@
+mail for cancelling order -buyer -non reg use
+mail for reporting order -admin -buyer -seller - nonRegUser
