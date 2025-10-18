@@ -2,7 +2,8 @@ const mongoose = require("mongoose");
 
 const credentialSchema = new mongoose.Schema(
   {
-    orderId:{type:mongoose.Schema.Types.ObjectId, ref:"Order"},
+    orderId: { type: mongoose.Schema.Types.ObjectId, ref: "Order" },
+    viewed: { type: Boolean, default: false, viewedAt: Date },
     credentials: {
       username: { type: String },
       password: { type: String },
