@@ -88,7 +88,6 @@ exports.initPayment = async (req, res) => {
 exports.verifyPament = async (req, res) => {
   try {
     const { reference } = req.query;
-
     //Check if reference is provided
     if (!reference) {
       return res.status(400).json({ message: "No reference provided" });
