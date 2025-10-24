@@ -2,24 +2,25 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { User } = require("../models/users.model");
 const Wallet = require("../models/wallet.model");
+const PendingUser = require("../models/pendingUser.model");
 const emailTemplate = require("../utils/mailer");
 const emailObserver = require("../utils/observers/email.observer");
 const credentials = require("../configs/credentials");
-
 exports.sendRegOtp = async (req, res) => {
   try {
     const { email } = req.body;
+    //verify email is provided
     if (!email) {
       return res.status(400).json({ error: "Email is required" });
     }
     const existingPendingUser = await PendingUser.findOne({ email });
     if (existingPendingUser) {
+      console.log({ otp: existingPendingUser.otp });
       // Mail data for template
       const mailData = {
         userName: email.split("@")[0], // fallback: use first part of email
         otp: existingPendingUser.otp,
       };
-
       // Send email
       emailObserver.emit("SEND_MAIL", {
         to: existingPendingUser.email,
@@ -27,43 +28,46 @@ exports.sendRegOtp = async (req, res) => {
         templateFunc: emailTemplate.otpRegistrationTemplate,
         templateData: mailData,
       });
-      return res.status(200).json({success:true})
-    }else{
-    const existingEmial = await User.findOne({ email });
-    if (existingEmial)
-      return res
-        .status(400)
-        .json({ message: "User with this email already exist" });
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      return res.status(200).json({ success: true });
+    } else {
+      const existingEmail = await User.findOne({ email });
+      if (existingEmail)
+        return res
+          .status(400)
+          .json({ message: "User with this email already exist" });
+      // Generate 6-digit OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      console.log({ otp });
 
-    // Upsert pending user
-    const user = await PendingUser.findOneAndUpdate(
-      { email },
-      {
-        email,
+      // Upsert pending user
+      const user = await PendingUser.findOneAndUpdate(
+        { email },
+        {
+          email,
+          otp,
+          createdAt: new Date(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+        { new: true, upsert: true }
+      );
+
+      // Mail data for template
+      const mailData = {
+        userName: email.split("@")[0], // fallback: use first part of email
         otp,
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      },
-      { new: true, upsert: true }
-    );
+      };
 
-    // Mail data for template
-    const mailData = {
-      userName: email.split("@")[0], // fallback: use first part of email
-      otp,
-    };
+      // Send email
+      emailObserver.emit("SEND_MAIL", {
+        to: user.email,
+        subject: "🔔 Your OTP Code",
+        templateFunc: emailTemplate.otpRegistrationTemplate,
+        templateData: mailData,
+      });
 
-    // Send email
-    emailObserver.emit("SEND_MAIL", {
-      to: user.email,
-      subject: "🔔 Your OTP Code",
-      templateFunc: emailTemplate.otpRegistrationTemplate,
-      templateData: mailData,
-    });
-
-    res.status(200).json({ message: "OTP sent successfully", email });
+      res
+        .status(200)
+        .json({ message: "OTP sent successfully", success: true, email });
     }
   } catch (error) {
     console.error("Error sending OTP:", error);
@@ -82,12 +86,16 @@ exports.verifyRegOtp = async (req, res) => {
     // Find pending user
     const pendingUser = await PendingUser.findOne({ email });
     if (!pendingUser) {
-      return res.status(404).json({ error: "No pending registration found for this email" });
+      return res
+        .status(404)
+        .json({ error: "No pending registration found for this email" });
     }
 
     // Check expiration (MongoDB TTL may already delete, but double-check)
     if (pendingUser.expiresAt < new Date()) {
-      return res.status(400).json({ error: "OTP has expired. Please request a new one." });
+      return res
+        .status(400)
+        .json({ error: "OTP has expired. Please request a new one." });
     }
 
     // Check OTP
@@ -98,16 +106,13 @@ exports.verifyRegOtp = async (req, res) => {
     // OTP verified ✅
     return res.status(200).json({
       message: "OTP verified successfully",
-      success:true,
+      success: true,
     });
-
   } catch (error) {
     console.error("Error verifying OTP:", error);
     res.status(500).json({ error: "Failed to verify OTP" });
   }
 };
-
-
 
 exports.register = async (req, res) => {
   try {
@@ -131,6 +136,7 @@ exports.register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(req.body.password, 10);
     const user = new User({
       ...req.body,
+      "address.country": country,
       password: hashedPassword,
       isAdmin: false,
     });
@@ -194,7 +200,7 @@ exports.login = async (req, res) => {
       templateFunc: emailTemplate.loginNotificationTemplate,
       templateData: { userName: user.username, ip, time },
     });
-    
+
     return res.status(200).json({ accessToken, success: true });
   } catch (err) {
     console.log(err);

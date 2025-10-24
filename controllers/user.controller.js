@@ -1,10 +1,9 @@
 const { User } = require("../models/users.model");
 const Wallet = require("../models/wallet.model");
-const  Asset  = require("../models/assets.model");
+const Asset = require("../models/assets.model");
 const { deleteFile } = require("../utils/fileStorage");
-const { sendEmail } = require("../utils/mailer/mailer");
-const credentials = require("../configs/credentials");
-const {paginate} = require("../utils/pagination")
+const Cart = require("../models/cart.model");
+const { paginate } = require("../utils/pagination");
 
 //Get all users
 exports.getAllusers = async (req, res) => {
@@ -29,10 +28,11 @@ exports.getAllusers = async (req, res) => {
 // Get user profile
 exports.getuserProfile = async (req, res) => {
   try {
-    const id = req.user.isAdmin && req.query.id? req.query.id : req.user.userId;
-    const user = await User
-      .findOne({ _id: id })
-      .select("-password -updatedAt -otp -isAdmin");
+    const id =
+      req.user.isAdmin && req.query.id ? req.query.id : req.user.userId;
+    const user = await User.findOne({ _id: id }).select(
+      "-password -updatedAt -otp -isAdmin"
+    );
     if (!user) return res.status(400).json({ message: "user Not Found!" });
     res.status(200).send(user);
   } catch (error) {
@@ -92,7 +92,7 @@ exports.suspensionToggler = async (req, res) => {
     const user = await User.findById(req.params.id).select("isSuspended");
     user.isSuspended = !user.isSuspended;
     await user.save();
-    res.status(200).json({ suspended:user.isSuspended });
+    res.status(200).json({ suspended: user.isSuspended });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -101,34 +101,63 @@ exports.suspensionToggler = async (req, res) => {
 // Delete user account
 exports.deleteUser = async (req, res) => {
   try {
-    if (req.user.userId === req.params.id || req.user.isAdmin) {
-      const id = req.user.isAdmin ? req.params.id : req.user.userId;
-      //delete user wallet
-      const wallet = await Wallet.findOneAndDelete({ owner: id });
-      // if (!wallet) return res.status(404).json({ message: "Wallet not found" });
+    const { id } = req.params;
+    const { userId, isAdmin } = req.user;
 
-      const Removeduser = await User.findByIdAndDelete(id);
-      const deleteUserAssets = await Asset.find({ seller: id });
-      //delete user assets
-      await Promise.all(
-        deleteUserAssets.map(async (asset) => {
-          // Delete image from Mega
-          if (asset.image) {
-            const deleteImage = await deleteFile(asset.image, "asset");
-            if (!deleteImage) throw new Error("Failed to delete asset image");
-          }
-          await Asset.findByIdAndDelete(asset._id);
-        })
-      );
-
-      if (!Removeduser)
-        return res.status(400).json({ message: "user Not Found!" });
-
-      return res.status(200).json({ success: true, message: "user Removed!" });
+    // Check authorization
+    if (userId !== id && !isAdmin) {
+      return res.status(403).json({ message: "Forbidden!" });
     }
 
-    return res.status(403).json({ message: "Forbidden!" });
+    const targetUserId = isAdmin ? id : userId;
+
+    // Find user and assets in parallel
+    const [user, userAssets] = await Promise.all([
+      User.findById(targetUserId),
+      Asset.find({ seller: targetUserId }),
+    ]);
+
+    if (!user) {
+      return res.status(400).json({ message: "User Not Found!" });
+    }
+
+    // Create all deletion operations
+    const deletionOperations = [
+      // Delete user
+      User.findByIdAndDelete(targetUserId),
+
+      // Delete cart
+      Cart.findOneAndDelete({ user: targetUserId }),
+
+      // Delete wallet
+      Wallet.findOneAndDelete({ owner: targetUserId }),
+
+      // Delete all assets and their images
+      ...userAssets.map(async (asset) => {
+        try {
+          // Delete image if exists
+          if (asset.image) {
+            await deleteFile(asset.image, "asset");
+          }
+          // Delete asset
+          await Asset.findByIdAndDelete(asset._id);
+        } catch (error) {
+          console.warn(`Error deleting asset ${asset._id}:`, error.message);
+          // Continue with other operations even if one fails
+        }
+      }),
+    ];
+
+    // Execute all operations in parallel
+    await Promise.all(deletionOperations);
+
+    return res.status(200).json({
+      success: true,
+      message: "User and all associated data removed successfully!",
+      deletedAssets: userAssets.length,
+    });
   } catch (err) {
+    console.error("Delete user error:", err);
     res.status(500).json({ message: err.message });
   }
 };

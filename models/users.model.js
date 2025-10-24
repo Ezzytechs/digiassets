@@ -36,7 +36,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
-    country: { required: [true, "Country cannot be empty!"] },
+    country: { type: String, required: [true, "Country cannot be empty!"] },
     password: {
       type: String,
       trim: true,

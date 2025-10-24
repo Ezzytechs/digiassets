@@ -1,11 +1,16 @@
 const express = require("express");
 const router = express.Router();
-const {auth} = require("../middlewares/auth/auth");
+const { auth } = require("../middlewares/auth/auth");
 const authController = require("../controllers/auth.controller");
+
+//registration otp
+router.post("/register/otp/generate", authController.sendRegOtp);
+
+//registration otp
+router.post("/register/otp/verify", authController.sendRegOtp);
 
 //register user
 router.post("/register", authController.register);
-
 //user login
 router.post("/login", authController.login);
 
