@@ -5,7 +5,7 @@ const orderSchema = new mongoose.Schema(
     buyer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required:false,
+      required: false,
     },
     seller: {
       type: mongoose.Schema.Types.ObjectId,
@@ -27,6 +27,7 @@ const orderSchema = new mongoose.Schema(
       default: "paid",
     },
     credentialsSubmittedAt: { type: Date },
+    credentialsViewed: { viewed: Boolean, default: false, viewedAt: Date },
     completedAt: { type: Date },
   },
   { timestamps: true }

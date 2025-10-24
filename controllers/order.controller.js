@@ -152,21 +152,24 @@ exports.markFakeOrder = async (req, res) => {
     }).populate("asset buyer seller");
 
     if (!order)
-      return res
-        .status(400)
-        .json({
-          message: "Order with the provided credentials does not exist",
-        });
+      return res.status(400).json({
+        message: "Order with the provided credentials does not exist",
+      });
 
     // Check if credentials were submitted
-    if (order.status !== "credentials_submitted") {
+    if (
+      order.status !== "credentials_submitted" ||
+      !order.credentialsViewed.viewed
+    ) {
       return res.status(400).json({
-        message: "Credentials have not been submitted by the seller",
+        message:
+          "Credentials have not been submitted by the seller or you have not comfirmed the credentials",
       });
     }
 
     // Mark order as fake
     order.status = "fake";
+    order.credentialsViewed = { viewed: false, viewedAt: null };
     await order.save();
 
     const { asset, buyer, seller, _id, price } = order;
@@ -544,6 +547,10 @@ exports.getDecryptedCredentials = async (req, res) => {
       password: decrypt(loginData.credentials.password),
       notes: decrypt(loginData.credentials.notes),
     };
+    if (!order.credentialsViewed.viewed) {
+      order.credentialsViewed = { viewedAt: Date.now(), viewed: true };
+      await order.save();
+    }
     verified.otp = { otpCode: null, otpExpires: null };
     await verified.save();
     const eventString = req.user.isAdmin ? "COMFIRM_SUBMISSION" : "VIEWED";
