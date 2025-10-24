@@ -20,10 +20,16 @@ exports.initPayment = async (req, res) => {
   let user = null;
   try {
     const { email, phone = "NA", assets, country } = req.body;
-    if (!email || !assets || !Array.isArray(assets) || assets.length === 0) {
+    if (
+      !email ||
+      !assets ||
+      !Array.isArray(assets) ||
+      assets.length === 0 ||
+      !country
+    ) {
       return res
         .status(400)
-        .json({ message: "Email and assets IDs are required" });
+        .json({ message: "Email, country and assets IDs are required" });
     }
     //get user details
     user = await User.findOne({ email });

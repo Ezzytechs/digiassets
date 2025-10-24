@@ -143,6 +143,7 @@ async function verifyTransfer(transfer_id) {
 }
 
 async function convertToLocalCurrency(usdAmount, country) {
+  if (!country) throw new Error("Country is required!");
   const countryInfo = getSupportedCountry({ country });
   if (!countryInfo) {
     throw new Error(

@@ -36,6 +36,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    country: { required: [true, "Country cannot be empty!"] },
     password: {
       type: String,
       trim: true,
@@ -60,6 +61,7 @@ userSchema.methods.generateAuthTokens = async function () {
     userId: user._id,
     username: user.username,
     email: user.email,
+    country: user.country,
     isAdmin: user.isAdmin,
   };
 
@@ -89,15 +91,3 @@ userSchema.methods.suspendUser = async function () {
 };
 exports.User = mongoose.model("User", userSchema);
 exports.userSchema = userSchema;
-// module.exports = mongoose.model("Order", orderSchema);
-
-// userSchema.methods.generateOTP = async function (otpType) {
-//   const user = this;
-//   const otpCode = Math.floor(100000 + Math.random() * 900000); // Generate a 6-digit OTP
-//   const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
-
-//   user.otp.push({ otpType, otpCode, otpExpires });
-//   await user.save();
-
-//   return { otpCode, otpExpires };
-// };
