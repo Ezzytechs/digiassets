@@ -27,7 +27,10 @@ const orderSchema = new mongoose.Schema(
       default: "paid",
     },
     credentialsSubmittedAt: { type: Date },
-    credentialsViewed: { viewed: Boolean, default: false, viewedAt: Date },
+    credentialsViewed: {
+      viewed: { type: Boolean, default: false },
+      viewedAt: { type: Date },
+    },
     completedAt: { type: Date },
   },
   { timestamps: true }
