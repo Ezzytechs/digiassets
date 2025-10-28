@@ -150,50 +150,78 @@ exports.verifyPament = async (req, res) => {
   }
 };
 
-exports.MakeTransafer = async (req, res) => {
+exports.makeTransfer = async (req, res) => {
   try {
     const { orderId } = req.body;
-    //get user details from order
+
+    // Get order details
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: "Order not found" });
-    if (order.status !== "credentials_submitted")
-      return res
-        .status(400)
-        .json({ message: "Credentials for this order is yet to be submitted" });
 
-    //get asset details
+    // Check if credentials have been viewed but not submitted
+    if (order.credentialsViewed.viewed && !order.credentialsViewed.viewedAt) {
+      return res.status(400).json({
+        message: "Credentials for this order are yet to be submitted",
+      });
+    }
+
+    // ✅ Check if order.credentialViewedAt is more than 48 hours ago
+    if (order.credentialsViewed.viewedAt) {
+      const viewedAt = new Date(order.credentialsViewed.viewedAt);
+      const now = new Date();
+      const diffInHours = (now - viewedAt) / (1000 * 60 * 60);
+      if (diffInHours < 48) {
+        return res.status(400).json({
+          message:
+            "Transfer cannot be made. Credentials in comfirmation process",
+        });
+      }
+    }
+
+    // Get asset details
     const asset = await Asset.findById(order.asset);
     if (!asset) return res.status(404).json({ message: "Asset not found" });
 
-    //get user wallet
-    const wallet = await Wallet.findOne({ user: asset.seller });
+    // Get seller's wallet
+    const wallet = await Wallet.findOne({ user: asset.seller }).populate(
+      "owner"
+    );
     if (!wallet)
       return res.status(404).json({ message: "User wallet not found" });
-    if (!wallet.accountDetails.sortCode || wallet.accountDetails.sortCode === 0)
+
+    if (!wallet.accountDetails) {
       return res.status(403).json({
         message:
-          "User wallet missing important credentials. User must update wallet to recieve funds.",
+          "User wallet missing important credentials. User must update wallet to receive funds.",
       });
+    }
 
-    //deduct percentage
+    // Deduct percentage
     const category = await Category.findById(asset.category);
     const amountToPay = asset.price * (1 - category.deductionPercentage / 100);
     if (amountToPay <= 0) {
       return res.status(400).json({ message: "Invalid amount to pay" });
     }
+
+    const { convertedAmount, currency } = await convertToLocalCurrency(
+      amountToPay,
+      wallet.owner?.country
+    );
+
     const transactionData = {
-      amount: amountToPay,
-      reference: `TRANSFER-${new Date().getTime()}`,
-      narration: `Payment for asset: ${asset.title}`,
-      bankCode: wallet.accountDetails.bankCode,
-      accountNumber: wallet.accountDetails.accountNumber,
-      currency: "NGN",
+      account_bank: wallet.accountDetails.bankName,
+      account_number: wallet.accountDetails.accountNumber,
+      amount: convertedAmount,
+      narration: `payment made for order ${asset.name + -+asset.id}`,
+      currency,
+      reference: Date.now().toString(),
     };
+
     const sendMoney = await makeTransfer(transactionData);
     if (!sendMoney) {
-      return res
-        .status(400)
-        .json({ message: "Unable to initiate the transfer. Please try again" });
+      return res.status(400).json({
+        message: "Unable to initiate the transfer. Please try again.",
+      });
     }
 
     const transaction = new Transaction({
@@ -206,13 +234,25 @@ exports.MakeTransafer = async (req, res) => {
       tnxReference: transactionData.reference,
       tnxDescription: transactionData.narration,
     });
+
     order.status = "completed";
     await order.save();
-    //send status
-    //email user
-    //email admin
+
+    // Send email notification to seller
+    emailObserver.emit("SEND_MAIL", {
+      to: asset.seller.email,
+      subject: "Payment Transfer Successful",
+      templateFunc: emailTemplate.sellerFundReceivedTemplate,
+      templateData: {
+        sellerName: wallet.owner.username || "Seller",
+        amount: convertedAmount,
+        assetName: asset.title,
+        orderLink: `${credentials.orderViewPage}/${order._id}`,
+      },
+    });
     res.status(200).json(transaction);
   } catch (err) {
+    console.error("❌ Transfer error:", err);
     res.status(500).json({ message: err.message });
   }
 };

@@ -16,7 +16,7 @@ const paymentRoutes = require("./routes/payment.routes");
 const transactionRoutes = require("./routes/transactions.routes");
 const platformRoutes = require("./routes/platform.routes");
 const notificationRoutes = require("./routes/notification.routes");
-const cartRoutes=require("./routes/cart.routes")
+const cartRoutes = require("./routes/cart.routes");
 const app = express();
 
 // Middleware
