@@ -25,7 +25,7 @@ exports.sendRegOtp = async (req, res) => {
       emailObserver.emit("SEND_MAIL", {
         to: existingPendingUser.email,
         subject: "🔔 Your OTP Code",
-        templateFunc: emailTemplate.otpRegistrationTemplate,
+        templateFunc: emailTemplate.registrationOtpTemplate,
         templateData: mailData,
       });
       return res.status(200).json({ success: true });
@@ -61,7 +61,7 @@ exports.sendRegOtp = async (req, res) => {
       emailObserver.emit("SEND_MAIL", {
         to: user.email,
         subject: "🔔 Your OTP Code",
-        templateFunc: emailTemplate.otpRegistrationTemplate,
+        templateFunc: emailTemplate.registrationOtpTemplate,
         templateData: mailData,
       });
 

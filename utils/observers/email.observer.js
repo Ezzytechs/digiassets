@@ -1,6 +1,5 @@
-// observers/emailObserver.js
 const EventEmitter = require("events");
-const { sendEmail } = require("../mailer/mailer"); // your nodemailer wrapper
+const { sendEmail } = require("../mailer/mailer");
 const credentials = require("../../configs/credentials");
 
 class EmailObserver extends EventEmitter {}

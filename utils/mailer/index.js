@@ -12,14 +12,18 @@ const {
 const {
   loginNotificationTemplate,
 } = require("./templates/loginNotificationTemplate");
-
+const {
+  registrationOtpTemplate,
+} = require("./templates/otpRegistrationTemplate.js");
 const {
   adminPaymentToSellerTemplate,
 } = require("./templates/adminPaymentToSellerTemplate.js");
 const {
   sellerFundReceivedTemplate,
 } = require("./templates/sellerFundReceivedTemplate.js");
-const { orderCancelledBuyerTemplate } = require("./templates/orderCancelledBuyer.js");
+const {
+  orderCancelledBuyerTemplate,
+} = require("./templates/orderCancelledBuyer.js");
 const {
   orderCancelledSellerTemplate,
 } = require("./templates/orderCancelledSeller.js");
@@ -29,9 +33,15 @@ const {
 const {
   oderCancelledNonRegUserTemplate,
 } = require("./templates/orderCancelledNonRegUser.js");
-const {orderReportedAdminTemplate} = require("./templates/orderReportedAdminTemplate.js")
-const {orderReportedBuyerTemplate} = require("./templates/orderReportedBuyerTemplate.js")
-const {orderReportedSellerTemplate} = require("./templates/orderReportedSellerTemplate.js")
+const {
+  orderReportedAdminTemplate,
+} = require("./templates/orderReportedAdminTemplate.js");
+const {
+  orderReportedBuyerTemplate,
+} = require("./templates/orderReportedBuyerTemplate.js");
+const {
+  orderReportedSellerTemplate,
+} = require("./templates/orderReportedSellerTemplate.js");
 const {
   orderSuccessfullBuyerTemplate,
 } = require("./templates/orderSuccessfullBuyerTemplate.js");
@@ -63,6 +73,7 @@ module.exports = {
   otpTemplate,
   passwordChangedTemplate,
   loginNotificationTemplate,
+  registrationOtpTemplate,
   adminPaymentToSellerTemplate,
   sellerFundReceivedTemplate,
   orderCancelledSellerTemplate,

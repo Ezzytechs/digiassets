@@ -1,28 +1,30 @@
-const nodemailer = require("nodemailer");
+require("dotenv").config();
+const sgMail = require("@sendgrid/mail");
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "jameze49@gmail.com",
-    pass: process.env.MAIL_SENDER_KEY,
-  },
-});
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const sendEmail = async ({ to, subject, html }) => {
-  const mailOptions = {
-    from: "jameze49@gmail.com",
+  const from = process.env.MAIL_FROM_EMAIL; // must be a verified sender in SendGrid
+
+  if (!from) {
+    throw new Error("MAIL_FROM_EMAIL is not defined in environment variables");
+  }
+
+  const msg = {
     to,
+    from,
     subject,
     html,
   };
+
   try {
-    const info = await transporter.sendMail(mailOptions);
-    return info;
+    const [response] = await sgMail.send(msg);
+    console.log("✅ Email sent successfully");
+    return response;
   } catch (err) {
+    console.error("❌ SendGrid error:", err.response?.body || err.message);
     throw new Error(err.message);
   }
 };
 
-module.exports = {
-  sendEmail,
-};
+module.exports = { sendEmail };
