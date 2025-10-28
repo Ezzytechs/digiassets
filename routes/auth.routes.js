@@ -7,7 +7,7 @@ const authController = require("../controllers/auth.controller");
 router.post("/register/otp/generate", authController.sendRegOtp);
 
 //registration otp
-router.post("/register/otp/verify", authController.sendRegOtp);
+router.post("/register/otp/verify", authController.verifyRegOtp);
 
 //register user
 router.post("/register", authController.register);

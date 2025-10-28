@@ -97,7 +97,6 @@ exports.verifyRegOtp = async (req, res) => {
         .status(400)
         .json({ error: "OTP has expired. Please request a new one." });
     }
-
     // Check OTP
     if (pendingUser.otp !== otp) {
       return res.status(400).json({ error: "Invalid OTP" });
