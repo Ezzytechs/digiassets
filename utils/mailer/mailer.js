@@ -4,7 +4,7 @@ const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const sendEmail = async ({ to, subject, html }) => {
-  const from = process.env.MAIL_FROM_EMAIL; // must be a verified sender in SendGrid
+  const from = process.env.SITE_EMAIL; 
 
   if (!from) {
     throw new Error("MAIL_FROM_EMAIL is not defined in environment variables");
