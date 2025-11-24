@@ -190,15 +190,15 @@ exports.login = async (req, res) => {
     }
     const { accessToken, refreshToken } = await user.generateAuthTokens();
     await user.setRefreshTokenCookie(res, refreshToken);
-    const time = new Date().toLocaleString();
-    const ip = req.ip;
+    // const time = new Date().toLocaleString();
+    // const ip = req.ip;
 
-    emailObserver.emit("SEND_MAIL", {
-      to: user.email,
-      subject: "🔔 New Login Notification",
-      templateFunc: emailTemplate.loginNotificationTemplate,
-      templateData: { userName: user.username, ip, time },
-    });
+    // emailObserver.emit("SEND_MAIL", {
+    //   to: user.email,
+    //   subject: "🔔 New Login Notification",
+    //   templateFunc: emailTemplate.loginNotificationTemplate,
+    //   templateData: { userName: user.username, ip, time },
+    // });
 
     return res.status(200).json({ accessToken, success: true });
   } catch (err) {
