@@ -135,7 +135,7 @@ exports.register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(req.body.password, 10);
     const user = new User({
       ...req.body,
-      "address.country": country,
+      "address.country": req.body.country,
       password: hashedPassword,
       isAdmin: false,
     });
