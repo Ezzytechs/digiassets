@@ -14,6 +14,10 @@ exports.sendRegOtp = async (req, res) => {
     if (!email) {
       return res.status(400).json({ error: "Email is required" });
     }
+      const user=await User.findOne({email})
+    if(user){
+      return res.status(400).json({ message: "User with this email already exist" });
+    }
     const existingPendingUser = await PendingUser.findOne({ email });
     if (existingPendingUser) {
       console.log({ otp: existingPendingUser.otp });
