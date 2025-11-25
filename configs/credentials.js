@@ -4,7 +4,7 @@ const { SITE_EMAIL, SITE_SUPPORT_EMAIL, SITE_PHONE } = process.env;
 //frontend url
 // const siteURL="http://localhost:3000"
 
-const siteURL = "https://digizzet.vercel.app";
+const siteURL = "https://digizzet.com";
 
 const credentials = {
   siteEmail: SITE_EMAIL,
