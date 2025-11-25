@@ -149,7 +149,7 @@ exports.register = async (req, res) => {
 
     const wallet = new Wallet({ owner: user._id });
     await wallet.save();
-  const cart = new Cart({ owner: user._id, items: [] });
+  const cart = new Cart({ user: user._id, items: [] });
     await cart.save();
     const { accessToken, refreshToken } = await newUser.generateAuthTokens();
 
