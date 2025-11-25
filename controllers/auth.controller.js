@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { User } = require("../models/users.model");
 const Wallet = require("../models/wallet.model");
+const {Cart}= require("../models/cart.model");
 const PendingUser = require("../models/pendingUser.model");
 const emailTemplate = require("../utils/mailer");
 const emailObserver = require("../utils/observers/email.observer");
@@ -37,8 +38,6 @@ exports.sendRegOtp = async (req, res) => {
           .json({ message: "User with this email already exist" });
       // Generate 6-digit OTP
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      console.log({ otp });
-
       // Upsert pending user
       const user = await PendingUser.findOneAndUpdate(
         { email },
@@ -146,7 +145,8 @@ exports.register = async (req, res) => {
 
     const wallet = new Wallet({ owner: user._id });
     await wallet.save();
-
+  const cart = new Cart({ owner: user._id, items: [] });
+    await cart.save();
     const { accessToken, refreshToken } = await newUser.generateAuthTokens();
 
     newUser.setRefreshTokenCookie(res, refreshToken);
