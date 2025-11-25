@@ -12,11 +12,9 @@ const cartSchema = new mongoose.Schema(
         asset: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "Asset",
-          required: true,
         },
         quantity: {
           type: Number,
-          required: true,
           default: 1,
           min: 1,
         },
