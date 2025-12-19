@@ -26,14 +26,11 @@ exports.getAllUserTransactions = async (req, res) => {
   try {
     let { limit = 10, page = 1, ...query } = req.query;
     const userId = req.user.userId;
-
     let filter = {};
 
     // If query is empty → fetch all user transactions (from OR to)
     if (Object.keys(query).length === 0) {
-      filter = {
-        $or: [{ from: userId }, { to: userId }],
-      };
+      filter = { $or: [{ from: userId }, { to: userId }] };
     } else {
       // If query has filters → still restrict to user
       query.to ? (query.to = userId) : query;
@@ -43,19 +40,17 @@ exports.getAllUserTransactions = async (req, res) => {
       };
     }
     const options = {
-      filter,
+      filter:{...filter},
       limit: Number(limit),
       page: Number(page),
-      populate: [
-        { path: "from", select: "username email phone" },
-        { path: "to", select: "username email phone" },
-      ],
+      populate: "from to",
+      populateSelect: "username email phone",
       select: "-tnxDescription",
     };
 
     const transactions = await paginate(Transaction, options);
 
-    if (!transactions || transactions.docs.length === 0) {
+    if (!transactions) {
       return res.status(404).json({ message: "No transaction found" });
     }
 
@@ -65,7 +60,6 @@ exports.getAllUserTransactions = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
 // Get total amount of all transactions
 exports.getTotalTransactionAmount = async (req, res) => {
   try {
