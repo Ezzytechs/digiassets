@@ -9,6 +9,9 @@ router.get('/', auth, admin, transactionController.getAllTransactions);
 //get all user transactions -users
 router.get('/my-transactions-history', auth, transactionController.getAllUserTransactions);
 
+//get all user transactions -users
+router.get('/my-transactions-history/count', auth, transactionController.countUserTransactions);
+
 //get total transaction amount [including debit and credit]
 router.get('/total', auth, admin, transactionController.getTotalTransactionAmount);
 
