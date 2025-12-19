@@ -36,12 +36,12 @@ exports.getAllUserTransactions = async (req, res) => {
       };
     } else {
       // If query has filters → still restrict to user
+      query.to ? (query.to = userId) : query;
+      query.from ? (query.from = userId) : query;
       filter = {
         ...query,
-        $or: [{ from: userId }, { to: userId }],
       };
     }
-
     const options = {
       filter,
       limit: Number(limit),
