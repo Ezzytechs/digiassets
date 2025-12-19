@@ -24,27 +24,44 @@ exports.getAllTransactions = async (req, res) => {
 
 exports.getAllUserTransactions = async (req, res) => {
   try {
-    console.log("Getting user transactions");
-    let { limit, page, ...query } = req.query;
-    //disallow using from accessing other user transactions history
-    console.log(query);
-
+    let { limit = 10, page = 1, ...query } = req.query;
     const userId = req.user.userId;
-    query.to ? (query.to = userId) : query;
-    query.from ? (query.from = userId) : query;
+
+    let filter = {};
+
+    // If query is empty → fetch all user transactions (from OR to)
+    if (Object.keys(query).length === 0) {
+      filter = {
+        $or: [{ from: userId }, { to: userId }],
+      };
+    } else {
+      // If query has filters → still restrict to user
+      filter = {
+        ...query,
+        $or: [{ from: userId }, { to: userId }],
+      };
+    }
+
     const options = {
-      filter: { ...query },
-      limit,
-      page,
-      populate: "to from",
-      populateSelect: "username email phone",
+      filter,
+      limit: Number(limit),
+      page: Number(page),
+      populate: [
+        { path: "from", select: "username email phone" },
+        { path: "to", select: "username email phone" },
+      ],
       select: "-tnxDescription",
     };
+
     const transactions = await paginate(Transaction, options);
-    if (!transactions || transactions.length === 0)
+
+    if (!transactions || transactions.docs.length === 0) {
       return res.status(404).json({ message: "No transaction found" });
+    }
+
     res.status(200).json(transactions);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -124,6 +141,38 @@ exports.getTransactionsStats = async (req, res) => {
     res.status(500).json({ message: "Something went wrong" });
   }
 };
+exports.countUserTransactions = async (req, res) => {
+  try {
+    const userIdParam = req.params.userId;
+    const loggedInUserId = req.user.userId;
+
+    let filter = {};
+
+    // ✅ Admin logic
+    if (req.user.isAdmin) {
+      if (userIdParam && userIdParam !== "all-users") {
+        // Count transactions for a specific user
+        filter = {
+          $or: [{ from: userIdParam }, { to: userIdParam }],
+        };
+      }
+      // else: admin + all-users → no filter (count everything)
+    } 
+    // ✅ Normal user logic
+    else {
+      filter = {
+        $or: [{ from: loggedInUserId }, { to: loggedInUserId }],
+      };
+    }
+
+    const count = await Transaction.countDocuments(filter);
+
+    res.status(200).json({ transactionCount: count });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 /*TO BE FEATURED IN FUTURE DOCUMENTATION IF NEED ARISE AND ALL CODES WELL CHECKED AND TESTED!!! */
 // // Get all credit transactions
 // exports.getCreditTransactions = async (req, res) => {
